@@ -14,14 +14,14 @@ export enum Gender {
 export enum CivilStatus {
   SINGLE = 'Soltero',
   MARRIED = 'Casado',
-  FREE_UNION = 'Unión libre'
+  FREE_UNION = 'Unión Libre'
 }
 
 export enum MembershipType {
-  PASTORAL = 'Cuerpo pastoral',
-  LEADER = 'Líder',
-  ASSISTANT = 'Asistente',
-  NEW = 'Nuevo'
+  MIEMBRO = 'Miembro',
+  VISITANTE = 'Visitante',
+  SIMPATIZANTE = 'Simpatizante'
+ 
 }
 
 export enum Occupation {

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
 import { Ministry, MinistryStatus } from '../types';
+import { storage } from '../services/storage';
 
 interface Props {
   ministries: Ministry[];
@@ -29,23 +30,58 @@ const MinistriesView: React.FC<Props> = ({ ministries, setMinistries }) => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setMinistries(ministries.map(m => m.id === editingItem.id ? { ...m, ...formData } : m));
-    } else {
-      const newMinistry: Ministry = {
-        id: crypto.randomUUID(),
-        ...formData
-      };
-      setMinistries([...ministries, newMinistry]);
+    
+    try {
+      if (editingItem) {
+        // Actualizar ministerio existente
+        console.log('📝 Actualizando ministerio:', editingItem.id);
+        await storage.updateMinistries(editingItem.id, formData);
+        
+        // Actualizar estado local
+        setMinistries(ministries.map(m => 
+          m.id === editingItem.id ? { ...m, ...formData } : m
+        ));
+        console.log('✅ Ministerio actualizado correctamente');
+      } else {
+        // Crear nuevo ministerio
+        console.log('➕ Creando nuevo ministerio');
+        const newMinistry: Ministry = {
+          id: crypto.randomUUID(),
+          ...formData
+        };
+        
+        // Intentar guardar en la API
+        await storage.saveMinistries([...ministries, newMinistry]);
+        
+        // Si es exitoso, refrescar la lista desde la API
+        const updatedMinistries = await storage.getMinistries();
+        setMinistries(updatedMinistries);
+        
+        console.log('✅ Ministerio creado correctamente');
+      }
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error('❌ Error al guardar ministerio:', error);
+      const errorMessage = error.message || 'Error desconocido al guardar';
+      alert(errorMessage);
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar este ministerio?')) {
-      setMinistries(ministries.filter(m => m.id !== id));
+      try {
+        console.log('🗑️ Eliminando ministerio:', id);
+        await storage.deleteMinistries(id);
+        
+        // Actualizar estado local
+        setMinistries(ministries.filter(m => m.id !== id));
+        console.log('✅ Ministerio eliminado correctamente');
+      } catch (error) {
+        console.error('❌ Error al eliminar ministerio:', error);
+        alert('Error al eliminar. Por favor intenta de nuevo.');
+      }
     }
   };
 

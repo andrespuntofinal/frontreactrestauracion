@@ -9,6 +9,7 @@ import {
   Person, Ministry, IdType, Gender, Population, MinistryStatus, 
   CivilStatus, MembershipType, PersonStatus, Occupation 
 } from '../types';
+import { storage } from '../services/storage';
 
 interface Props {
   people: Person[];
@@ -89,21 +90,62 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
     e.target.value = '';
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setPeople(people.map(p => p.id === editingItem.id ? { ...editingItem, ...formData } : p));
-    } else {
-      setPeople([...people, { id: crypto.randomUUID(), ...formData }]);
+    
+    try {
+      if (editingItem) {
+        // Actualizar persona existente
+        console.log('📝 Actualizando persona:', editingItem.id);
+        await storage.updatePeople(editingItem.id, formData);
+        
+        // Actualizar estado local
+        setPeople(people.map(p => 
+          p.id === editingItem.id ? { ...p, ...formData } : p
+        ));
+        console.log('✅ Persona actualizada correctamente');
+      } else {
+        // Crear nueva persona
+        console.log('➕ Creando nueva persona');
+        const newPerson: Person = {
+          id: crypto.randomUUID(),
+          ...formData
+        };
+        
+        // Intentar guardar en la API
+        await storage.savePeople([...people, newPerson]);
+        
+        // Si es exitoso, refrescar la lista desde la API
+        const updatedPeople = await storage.getPeople();
+        setPeople(updatedPeople);
+        
+        console.log('✅ Persona creada correctamente');
+      }
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error('❌ Error al guardar persona:', error);
+      const errorMessage = error.message || 'Error desconocido al guardar';
+      alert(errorMessage);
     }
-    setIsModalOpen(false);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (itemToDelete) {
-      const newPeople = people.filter(p => p.id !== itemToDelete);
-      setPeople(newPeople);
-      setItemToDelete(null);
+      try {
+        console.log('🗑️ Eliminando persona:', itemToDelete);
+        await storage.deletePeople(itemToDelete);
+        
+        // Actualizar estado local
+        const newPeople = people.filter(p => p.id !== itemToDelete);
+        setPeople(newPeople);
+        setItemToDelete(null);
+        
+        console.log('✅ Persona eliminada correctamente');
+      } catch (error: any) {
+        console.error('❌ Error al eliminar persona:', error);
+        const errorMessage = error.message || 'Error desconocido al eliminar';
+        alert(errorMessage);
+      }
     }
   };
 
@@ -226,6 +268,37 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
               alt="Ampliada" 
               onClick={(e) => e.stopPropagation()} 
             />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 animate-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-6">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            
+            <h3 className="text-xl font-bold text-slate-900 text-center mb-3">Eliminar Persona</h3>
+            <p className="text-slate-600 text-center mb-8">
+              ¿Estás seguro de que deseas eliminar esta persona? Esta acción no se puede deshacer.
+            </p>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setItemToDelete(null)}
+                className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-red-100"
+              >
+                Eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -392,6 +465,12 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Barrio</label>
                   <input type="text" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100" value={formData.neighborhood} onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })} />
                 </div>
+        
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Dirección</label>
+                  <input type="text" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+                </div>
+
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Ocupación</label>
