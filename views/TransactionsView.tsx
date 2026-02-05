@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Search, X, Filter, Download, FileText, ArrowUpCircle, ArrowDownCircle, Edit2, Wallet, CreditCard } from 'lucide-react';
+import { Plus, Trash2, Search, X, Filter, Download, FileText, ArrowUpCircle, ArrowDownCircle, Edit2, Wallet, CreditCard, AlertTriangle } from 'lucide-react';
 import { Transaction, TransactionType, PaymentMethod, Category, Person } from '../types';
+import { storage } from '../services/storage';
 
 interface Props {
   transactions: Transaction[];
@@ -16,10 +17,11 @@ const TransactionsView: React.FC<Props> = ({ transactions, setTransactions, cate
   const [editingItem, setEditingItem] = useState<Transaction | null>(null);
   const [filterType, setFilterType] = useState<TransactionType | 'ALL'>('ALL');
   const [displayValue, setDisplayValue] = useState('');
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Omit<Transaction, 'id'>>({
     type: TransactionType.INCOME,
-    paymentMethod: PaymentMethod.CASH,
+    medioTrx: PaymentMethod.CASH,
     categoryId: '',
     date: new Date().toISOString().split('T')[0],
     value: 0,
@@ -56,7 +58,7 @@ const TransactionsView: React.FC<Props> = ({ transactions, setTransactions, cate
       setEditingItem(null);
       setFormData({
         type: TransactionType.INCOME,
-        paymentMethod: PaymentMethod.CASH,
+        medioTrx: PaymentMethod.CASH,
         categoryId: categories.find(c => c.type === TransactionType.INCOME)?.id || '',
         date: new Date().toISOString().split('T')[0],
         value: 0,
@@ -86,19 +88,67 @@ const TransactionsView: React.FC<Props> = ({ transactions, setTransactions, cate
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setTransactions(transactions.map(t => t.id === editingItem.id ? { ...editingItem, ...formData } : t));
-    } else {
-      setTransactions([{ id: crypto.randomUUID(), ...formData }, ...transactions]);
+    
+    const normalizedFormData: Omit<Transaction, 'id'> = {
+      ...formData,
+      personId: formData.personId ? formData.personId : undefined
+    };
+    
+    try {
+      if (editingItem) {
+        // Actualizar transacción existente
+        console.log('📝 Actualizando transacción:', editingItem.id);
+        await storage.updateTransactions(editingItem.id, normalizedFormData);
+        
+        // Actualizar estado local
+        setTransactions(transactions.map(t => 
+          t.id === editingItem.id ? { ...t, ...normalizedFormData } : t
+        ));
+        console.log('✅ Transacción actualizada correctamente');
+      } else {
+        // Crear nueva transacción
+        console.log('➕ Creando nueva transacción');
+        const newTransaction: Transaction = {
+          id: crypto.randomUUID(),
+          ...normalizedFormData
+        };
+        
+        // Intentar guardar en la API
+        await storage.saveTransactions([...transactions, newTransaction]);
+        
+        // Si es exitoso, refrescar la lista desde la API
+        const updatedTransactions = await storage.getTransactions();
+        setTransactions(updatedTransactions);
+        
+        console.log('✅ Transacción creada correctamente');
+      }
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error('❌ Error al guardar transacción:', error);
+      const errorMessage = error.message || 'Error desconocido al guardar';
+      alert(errorMessage);
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar transacción?')) {
-      setTransactions(transactions.filter(t => t.id !== id));
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      try {
+        console.log('🗑️ Eliminando transacción:', itemToDelete);
+        await storage.deleteTransactions(itemToDelete);
+        
+        // Actualizar estado local
+        const newTransactions = transactions.filter(t => t.id !== itemToDelete);
+        setTransactions(newTransactions);
+        setItemToDelete(null);
+        
+        console.log('✅ Transacción eliminada correctamente');
+      } catch (error: any) {
+        console.error('❌ Error al eliminar transacción:', error);
+        const errorMessage = error.message || 'Error desconocido al eliminar';
+        alert(errorMessage);
+      }
     }
   };
 
@@ -171,7 +221,7 @@ const TransactionsView: React.FC<Props> = ({ transactions, setTransactions, cate
                       {categories.find(c => c.id === t.categoryId)?.name}
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      {t.paymentMethod === PaymentMethod.CASH ? (
+                      {t.medioTrx === PaymentMethod.CASH ? (
                         <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 uppercase bg-amber-50 px-1.5 py-0.5 rounded">
                           <Wallet className="w-3 h-3" /> Efectivo
                         </span>
@@ -206,7 +256,7 @@ const TransactionsView: React.FC<Props> = ({ transactions, setTransactions, cate
                           <Download className="w-4 h-4" />
                         </a>
                       )}
-                      <button onClick={() => handleDelete(t.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
+                      <button onClick={() => setItemToDelete(t.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -255,15 +305,15 @@ const TransactionsView: React.FC<Props> = ({ transactions, setTransactions, cate
                   <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
                     <button 
                       type="button"
-                      className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${formData.paymentMethod === PaymentMethod.CASH ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400'}`}
-                      onClick={() => setFormData({ ...formData, paymentMethod: PaymentMethod.CASH })}
+                      className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${formData.medioTrx === PaymentMethod.CASH ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400'}`}
+                      onClick={() => setFormData({ ...formData, medioTrx: PaymentMethod.CASH })}
                     >
                       Efectivo
                     </button>
                     <button 
                       type="button"
-                      className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${formData.paymentMethod === PaymentMethod.TRANSFER ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
-                      onClick={() => setFormData({ ...formData, paymentMethod: PaymentMethod.TRANSFER })}
+                      className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${formData.medioTrx === PaymentMethod.TRANSFER ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+                      onClick={() => setFormData({ ...formData, medioTrx: PaymentMethod.TRANSFER })}
                     >
                       Transferencia
                     </button>
@@ -357,6 +407,37 @@ const TransactionsView: React.FC<Props> = ({ transactions, setTransactions, cate
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 animate-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-6">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            
+            <h3 className="text-xl font-bold text-slate-900 text-center mb-3">Eliminar Transacción</h3>
+            <p className="text-slate-600 text-center mb-8">
+              ¿Estás seguro de que deseas eliminar esta transacción? Esta acción no se puede deshacer.
+            </p>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setItemToDelete(null)}
+                className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-red-100"
+              >
+                Eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -327,23 +327,277 @@ export const storage = {
 
   // CATEGORÍAS
   getCategories: async (): Promise<Category[]> => {
-    const data = localStorage.getItem('cp_categories');
-    return data ? JSON.parse(data) : [
-      { id: '1', name: 'Diezmos', type: 'Ingreso' },
-      { id: '2', name: 'Ofrendas', type: 'Ingreso' },
-      { id: '3', name: 'Servicios', type: 'Gasto' }
-    ];
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/categories`, { headers });
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching categories: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Categorías obtenidas:', result.data);
+      
+      // Extraer el array 'data' de la respuesta
+      return result.data || [];
+    } catch (error) {
+      console.error('❌ Error getCategories:', error);
+      // Fallback a localStorage
+      return JSON.parse(localStorage.getItem('cp_categories') || '[]');
+    }
   },
+
   saveCategories: async (data: Category[]) => {
-    localStorage.setItem('cp_categories', JSON.stringify(data));
+    try {
+      const headers = await getAuthHeaders();
+      
+      console.log('📝 Categorías recibidas para guardar:', data);
+      
+      // Filtrar solo las categorías nuevas (UUIDs con guiones)
+      const newCategories = data.filter(category => 
+        category.id.includes('-')
+      );
+      
+      console.log('✨ Nuevas categorías a enviar a API:', newCategories);
+      
+      let result;
+      // Enviar solo los nuevos
+      for (const category of newCategories) {
+        const payload = {
+          name: category.name,
+          type: category.type
+        };
+        
+        console.log('📤 Enviando categoría:', payload);
+        
+        const response = await fetch(`${API_URL}/categories`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+        
+        result = await response.json();
+        
+        if (!response.ok) {
+          // Detectar error de duplicado E11000
+          if (result.message?.includes('E11000') || result.message?.includes('duplicate')) {
+            console.warn(`⚠️ La categoría "${category.name}" ya existe`);
+            throw new Error(`⚠️ La categoría "${category.name}" ya existe en la base de datos`);
+          }
+          
+          console.error('❌ Error del servidor:', result.message);
+          throw new Error(result.message || `Error saving category: ${response.status}`);
+        }
+        
+        console.log('✅ Categoría guardada:', result);
+      }
+      
+      // Guardar en localStorage como respaldo
+      localStorage.setItem('cp_categories', JSON.stringify(data));
+      return result;
+    } catch (error) {
+      console.error('❌ Error saveCategories:', error);
+      localStorage.setItem('cp_categories', JSON.stringify(data));
+      throw error;
+    }
+  },
+
+  updateCategories: async (id: string, data: Omit<Category, 'id'>) => {
+    try {
+      const headers = await getAuthHeaders();
+      
+      const payload = {
+        name: data.name,
+        type: data.type
+      };
+      
+      console.log('📝 Actualizando categoría con ID:', id, 'Datos:', payload);
+      
+      const response = await fetch(`${API_URL}/categories/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error updating category: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ Categoría actualizada:', result);
+      return result.data;
+    } catch (error) {
+      console.error('❌ Error updateCategories:', error);
+      throw error;
+    }
+  },
+
+  deleteCategories: async (id: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      
+      console.log('🗑️ Eliminando categoría con ID:', id);
+      
+      const response = await fetch(`${API_URL}/categories/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error deleting category: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ Categoría eliminada:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Error deleteCategories:', error);
+      throw error;
+    }
   },
 
   // TRANSACCIONES
   getTransactions: async (): Promise<Transaction[]> => {
-    return JSON.parse(localStorage.getItem('cp_transactions') || '[]');
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/transactions`, { headers });
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching transactions: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Transacciones obtenidas:', result.data);
+      
+      // Extraer el array 'data' de la respuesta
+      return result.data || [];
+    } catch (error) {
+      console.error('❌ Error getTransactions:', error);
+      // Fallback a localStorage
+      return JSON.parse(localStorage.getItem('cp_transactions') || '[]');
+    }
   },
   saveTransactions: async (data: Transaction[]) => {
-    localStorage.setItem('cp_transactions', JSON.stringify(data));
+    try {
+      const headers = await getAuthHeaders();
+      
+      console.log('📝 Transacciones recibidas para guardar:', data);
+      
+      // Filtrar solo las transacciones nuevas (UUIDs con guiones)
+      const newTransactions = data.filter(transaction => 
+        transaction.id.includes('-')
+      );
+      
+      console.log('✨ Nuevas transacciones a enviar a API:', newTransactions);
+      
+      let result;
+      // Enviar solo las nuevas
+      for (const transaction of newTransactions) {
+        const payload: any = {
+          type: transaction.type,
+          categoryId: transaction.categoryId,
+          medioTrx: transaction.medioTrx,
+          date: transaction.date,
+          value: transaction.value,
+          observations: transaction.observations,
+          attachmentUrl: transaction.attachmentUrl ?? null,
+          attachmentName: transaction.attachmentName ?? null
+        };
+
+        if (transaction.personId) {
+          payload.personId = transaction.personId;
+        }
+        
+        console.log('📤 Enviando transacción:', payload);
+        
+        const response = await fetch(`${API_URL}/transactions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+        
+        result = await response.json();
+        
+        if (!response.ok) {
+          console.error('❌ Error del servidor:', result.message);
+          throw new Error(result.message || `Error saving transaction: ${response.status}`);
+        }
+        
+        console.log('✅ Transacción guardada:', result);
+      }
+      
+      // Guardar en localStorage como respaldo
+      localStorage.setItem('cp_transactions', JSON.stringify(data));
+      return result;
+    } catch (error) {
+      console.error('❌ Error saveTransactions:', error);
+      localStorage.setItem('cp_transactions', JSON.stringify(data));
+      throw error;
+    }
+  },
+
+  updateTransactions: async (id: string, data: Omit<Transaction, 'id'>) => {
+    try {
+      const headers = await getAuthHeaders();
+      
+      const payload: any = {
+        type: data.type,
+        categoryId: data.categoryId,
+        medioTrx: data.medioTrx,
+        date: data.date,
+        value: data.value,
+        observations: data.observations,
+        attachmentUrl: data.attachmentUrl ?? null,
+        attachmentName: data.attachmentName ?? null
+      };
+
+      if (data.personId) {
+        payload.personId = data.personId;
+      }
+      
+      console.log('📝 Actualizando transacción con ID:', id, 'Datos:', payload);
+      
+      const response = await fetch(`${API_URL}/transactions/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error updating transaction: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ Transacción actualizada:', result);
+      return result.data;
+    } catch (error) {
+      console.error('❌ Error updateTransactions:', error);
+      throw error;
+    }
+  },
+
+  deleteTransactions: async (id: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      
+      console.log('🗑️ Eliminando transacción con ID:', id);
+      
+      const response = await fetch(`${API_URL}/transactions/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error deleting transaction: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ Transacción eliminada:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Error deleteTransactions:', error);
+      throw error;
+    }
   },
 
   // USUARIOS

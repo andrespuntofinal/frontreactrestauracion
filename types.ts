@@ -129,7 +129,7 @@ export interface Category {
 export interface Transaction {
   id: string;
   type: TransactionType;
-  paymentMethod: PaymentMethod;
+  medioTrx: PaymentMethod;
   categoryId: string;
   date: string;
   value: number;

@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Tag, X, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Tag, X, ArrowUpCircle, ArrowDownCircle, AlertTriangle } from 'lucide-react';
 import { Category, TransactionType } from '../types';
+import { storage } from '../services/storage';
 
 interface Props {
   categories: Category[];
@@ -11,6 +12,7 @@ interface Props {
 const CategoriesView: React.FC<Props> = ({ categories, setCategories }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Category | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -28,19 +30,62 @@ const CategoriesView: React.FC<Props> = ({ categories, setCategories }) => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setCategories(categories.map(c => c.id === editingItem.id ? { ...c, ...formData } : c));
-    } else {
-      setCategories([...categories, { id: crypto.randomUUID(), ...formData }]);
+    
+    try {
+      if (editingItem) {
+        // Actualizar categoría existente
+        console.log('📝 Actualizando categoría:', editingItem.id);
+        await storage.updateCategories(editingItem.id, formData);
+        
+        // Actualizar estado local
+        setCategories(categories.map(c => 
+          c.id === editingItem.id ? { ...c, ...formData } : c
+        ));
+        console.log('✅ Categoría actualizada correctamente');
+      } else {
+        // Crear nueva categoría
+        console.log('➕ Creando nueva categoría');
+        const newCategory: Category = {
+          id: crypto.randomUUID(),
+          ...formData
+        };
+        
+        // Intentar guardar en la API
+        await storage.saveCategories([...categories, newCategory]);
+        
+        // Si es exitoso, refrescar la lista desde la API
+        const updatedCategories = await storage.getCategories();
+        setCategories(updatedCategories);
+        
+        console.log('✅ Categoría creada correctamente');
+      }
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error('❌ Error al guardar categoría:', error);
+      const errorMessage = error.message || 'Error desconocido al guardar';
+      alert(errorMessage);
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar categoría?')) {
-      setCategories(categories.filter(c => c.id !== id));
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      try {
+        console.log('🗑️ Eliminando categoría:', itemToDelete);
+        await storage.deleteCategories(itemToDelete);
+        
+        // Actualizar estado local
+        const newCategories = categories.filter(c => c.id !== itemToDelete);
+        setCategories(newCategories);
+        setItemToDelete(null);
+        
+        console.log('✅ Categoría eliminada correctamente');
+      } catch (error: any) {
+        console.error('❌ Error al eliminar categoría:', error);
+        const errorMessage = error.message || 'Error desconocido al eliminar';
+        alert(errorMessage);
+      }
     }
   };
 
@@ -78,7 +123,7 @@ const CategoriesView: React.FC<Props> = ({ categories, setCategories }) => {
               <button onClick={() => handleOpenModal(c)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
                 <Edit2 className="w-4 h-4" />
               </button>
-              <button onClick={() => handleDelete(c.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+              <button onClick={() => setItemToDelete(c.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -144,6 +189,37 @@ const CategoriesView: React.FC<Props> = ({ categories, setCategories }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 animate-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-6">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            
+            <h3 className="text-xl font-bold text-slate-900 text-center mb-3">Eliminar Categoría</h3>
+            <p className="text-slate-600 text-center mb-8">
+              ¿Estás seguro de que deseas eliminar esta categoría? Esta acción no se puede deshacer.
+            </p>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setItemToDelete(null)}
+                className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-red-100"
+              >
+                Eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}

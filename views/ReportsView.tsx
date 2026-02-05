@@ -45,7 +45,7 @@ const ReportsView: React.FC<Props> = ({ transactions, people, categories, minist
     return transactions.filter(t => {
       const dateMatch = (!startDate || t.date >= startDate) && (!endDate || t.date <= endDate);
       const typeMatch = selectedType === 'ALL' || t.type === selectedType;
-      const methodMatch = selectedMethod === 'ALL' || t.paymentMethod === selectedMethod;
+      const methodMatch = selectedMethod === 'ALL' || t.medioTrx === selectedMethod;
       const catMatch = selectedCategory === 'ALL' || t.categoryId === selectedCategory;
       const personMatch = selectedPerson === 'ALL' || t.personId === selectedPerson;
       return dateMatch && typeMatch && methodMatch && catMatch && personMatch;
