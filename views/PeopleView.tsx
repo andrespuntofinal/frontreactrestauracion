@@ -24,7 +24,8 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
   const [viewingItem, setViewingItem] = useState<Person | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-
+  const [currentPage, setCurrentPage] = useState(1);  // ← AGREGAR ESTO
+  const itemsPerPage = 5;  // ← AGREGAR ESTO
   const activeMinistries = ministries.filter(m => m.status === MinistryStatus.ACTIVE);
 
   const [formData, setFormData] = useState<Omit<Person, 'id'>>({
@@ -154,6 +155,16 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
     p.identification.includes(searchTerm)
   );
 
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = filtered.slice(startIndex, endIndex);
+  
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -179,7 +190,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
               placeholder="Buscar por nombre o identificación..."
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
         </div>
@@ -196,7 +207,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map(p => (
+              {paginatedData.map(p => (
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-4">
@@ -254,6 +265,46 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
           </table>
         </div>
       </div>
+
+      {/* Paginador */}
+        <div className="px-6 py-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+          <div className="text-sm text-slate-600 font-medium">
+            Mostrando <span className="font-bold">{startIndex + 1}</span> a <span className="font-bold">{Math.min(endIndex, filtered.length)}</span> de <span className="font-bold">{filtered.length}</span> registros
+          </div>
+        
+
+        <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium text-slate-600"
+            >
+              ← Anterior
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    currentPage === page
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
+                      : 'border border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+                        <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium text-slate-600"
+            >
+              Siguiente →
+            </button>
+        </div>
+        </div>
 
       {/* Lightbox para ampliar imagen */}
       {selectedPhoto && (
