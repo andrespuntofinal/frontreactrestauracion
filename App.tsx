@@ -20,7 +20,13 @@ import {
   BarChart3,
   Cake,
   PartyPopper,
-  Settings
+  Settings,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { storage } from './services/storage';
 import { 
@@ -43,6 +49,7 @@ import ReportsView from './views/ReportsView';
 import LandingView from './views/LandingView';
 import SiteParamsView from './views/SiteParamsView';
 import { getFinancialInsights } from './services/gemini';
+import { setAuthCredentials, getAuthToken, clearAuthToken } from './services/auth';
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'PUBLIC' | 'APP'>('PUBLIC');
@@ -62,34 +69,51 @@ const App: React.FC = () => {
   const [loadingAi, setLoadingAi] = useState(false);
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadSiteParams = async () => {
+      const s = await storage.getSiteParams();
+      setSiteParams(s);
+    };
+    loadSiteParams();
+  }, []);
+
+  useEffect(() => {
+    const loadProtectedData = async () => {
+      if (!currentUser) return;
       setIsSyncing(true);
-      const [m, p, c, t, u, s] = await Promise.all([
+      const [m, p, c, t, u] = await Promise.all([
         storage.getMinistries(),
         storage.getPeople(),
         storage.getCategories(),
         storage.getTransactions(),
-        storage.getUsers(),
-        storage.getSiteParams()
+        storage.getUsers()
       ]);
       setMinistries(m);
       setPeople(p);
       setCategories(c);
       setTransactions(t);
       setUsers(u);
-      setSiteParams(s);
       setIsSyncing(false);
     };
-    loadData();
-  }, []);
+    loadProtectedData();
+  }, [currentUser]);
 
-  const handleLogin = (demoUser: User) => {
-    setCurrentUser(demoUser);
+  const handleLogin = async (email: string, password: string) => {
+    setAuthCredentials(email, password);
+    await getAuthToken();
+
+    const found = await storage.getUserByEmail(email);
+    if (!found) {
+      clearAuthToken();
+      throw new Error('Usuario no encontrado en la base de datos');
+    }
+
+    setCurrentUser(found);
     setViewMode('APP');
     setActiveTab('HOME');
   };
 
   const handleLogout = () => {
+    clearAuthToken();
     setCurrentUser(null);
     setViewMode('PUBLIC');
     setActiveTab('HOME');
@@ -123,12 +147,16 @@ const App: React.FC = () => {
   const renderModule = () => {
     switch (activeTab) {
       case PermissionModule.MINISTRIES:
+        if (!hasAccess(PermissionModule.MINISTRIES)) return <HomeDashboard />;
         return <MinistriesView ministries={ministries} setMinistries={async (m) => { setMinistries(m); await storage.saveMinistries(m); }} />;
       case PermissionModule.PEOPLE:
+        if (!hasAccess(PermissionModule.PEOPLE)) return <HomeDashboard />;
         return <PeopleView people={people} setPeople={async (p) => { setPeople(p); await storage.savePeople(p); }} ministries={ministries} />;
       case PermissionModule.CATEGORIES:
+        if (!hasAccess(PermissionModule.CATEGORIES)) return <HomeDashboard />;
         return <CategoriesView categories={categories} setCategories={async (c) => { setCategories(c); await storage.saveCategories(c); }} />;
       case PermissionModule.TRANSACTIONS:
+        if (!hasAccess(PermissionModule.TRANSACTIONS)) return <HomeDashboard />;
         return <TransactionsView 
           transactions={transactions} 
           setTransactions={async (t) => { setTransactions(t); await storage.saveTransactions(t); }} 
@@ -136,10 +164,13 @@ const App: React.FC = () => {
           people={people} 
         />;
       case PermissionModule.REPORTS:
+        if (!hasAccess(PermissionModule.REPORTS)) return <HomeDashboard />;
         return <ReportsView transactions={transactions} people={people} categories={categories} ministries={ministries} />;
       case PermissionModule.ADMIN:
+        if (!hasAccess(PermissionModule.ADMIN)) return <HomeDashboard />;
         return <AdminView users={users} setUsers={async (u) => { setUsers(u); await storage.saveUsers(u); }} />;
       case PermissionModule.SITE_PARAMS:
+        if (!hasAccess(PermissionModule.SITE_PARAMS)) return <HomeDashboard />;
         return siteParams ? <SiteParamsView params={siteParams} setParams={async (s) => { setSiteParams(s); await storage.saveSiteParams(s); }} /> : null;
       case 'ASSISTANT':
         return <AssistantView people={people} ministries={ministries} transactions={transactions} categories={categories} />;
@@ -229,35 +260,134 @@ const App: React.FC = () => {
     </div>
   );
 
-  const LoginScreen = () => (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-8 border border-slate-100 text-center">
-        <button onClick={() => setViewMode('PUBLIC')} className="mb-6 text-slate-400 hover:text-indigo-600 flex items-center gap-2 mx-auto font-bold text-sm">
-          &larr; Volver al sitio público
-        </button>
-        <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-100">
-          <Church className="w-10 h-10 text-white" />
-        </div>
-        <h1 className="text-2xl font-black text-slate-900 mb-2">Acceso ComunidadPro</h1>
-        <p className="text-slate-500 mb-10">Ingresa para gestionar tu comunidad</p>
-        
-        <div className="space-y-4">
-          <button onClick={() => handleLogin(users[0])} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
-            Entrar como Administrador
-          </button>
+  const LoginScreen = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setError(null);
+
+      try {
+        await handleLogin(email, password);
+      } catch (loginError: any) {
+        setError(loginError?.message || 'Correo o contraseña incorrectos');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans relative overflow-hidden">
+        {/* Background shapes */}
+        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-100/50 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-violet-100/50 rounded-full blur-3xl animate-pulse" />
+
+        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-10 border border-slate-100 relative z-10 animate-in zoom-in-95 duration-300">
           <button 
-            onClick={() => handleLogin({ ...users[0], id: 'user-1', name: 'Colaborador', role: 'user', permissions: [PermissionModule.PEOPLE] })}
-            className="w-full border border-slate-200 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-50 transition-all"
+            onClick={() => setViewMode('PUBLIC')} 
+            className="mb-8 text-slate-400 hover:text-indigo-600 flex items-center gap-2 mx-auto font-bold text-sm transition-colors"
           >
-            Entrar como Colaborador
+            &larr; Volver al sitio público
           </button>
+
+          <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-200">
+            <Church className="w-12 h-12 text-white" />
+          </div>
+
+          <div className="text-center mb-10">
+            <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">ComunidadPro</h1>
+            <p className="text-slate-500 font-medium">Ingresa tus credenciales para continuar</p>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-sm font-bold animate-in slide-in-from-top-2">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Correo Electrónico</label>
+              <div className="relative group">
+                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+                <input 
+                  required
+                  type="email" 
+                  placeholder="ejemplo@comunidad.pro"
+                  autoComplete="username"
+                  className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-400 transition-all font-medium text-slate-900"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Contraseña</label>
+              <div className="relative group">
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+                <input 
+                  required
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  className="w-full pl-14 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-400 transition-all font-medium text-slate-900"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input type="checkbox" className="w-4 h-4 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                <span className="text-sm font-medium text-slate-500 group-hover:text-slate-700">Recordarme</span>
+              </label>
+              <button type="button" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">¿Olvidaste tu clave?</button>
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:translate-y-0"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  Iniciando sesión...
+                </>
+              ) : (
+                <>
+                  Ingresar al Panel
+                  <ChevronRight className="w-6 h-6" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <p className="mt-10 text-center text-slate-400 text-sm font-medium">
+            ¿No tienes cuenta? <button className="text-indigo-600 font-bold">Contáctanos</button>
+          </p>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  if (viewMode === 'PUBLIC' && siteParams) {
-    return <LandingView params={siteParams} onAdminAccess={() => setViewMode('APP')} />;
+  if (viewMode === 'PUBLIC') {
+    return siteParams ? <LandingView params={siteParams} onAdminAccess={() => setViewMode('APP')} /> : <div className="min-h-screen bg-white" />;
   }
 
   if (!currentUser) return <LoginScreen />;

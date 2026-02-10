@@ -1,10 +1,10 @@
 // Configuración de Google Identity Toolkit
-const FIREBASE_API_KEY = 'AIzaSyCPs7M66hCbZyRNmHO_Lo5zqxcRhY2qwzM';
+const FIREBASE_API_KEY = 'AIzaSyAB6bWuBpTcffLNbMV0rKKjj_0J52ZNRXk';
 const AUTH_ENDPOINT = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword';
 
-// Credenciales por defecto
-const DEFAULT_EMAIL = 'andrespuntofinal@gmail.com';
-const DEFAULT_PASSWORD = '123456';
+// Credenciales dinámicas (se establecen al iniciar sesión)
+let DEFAULT_EMAIL = '';
+let DEFAULT_PASSWORD = '';
 
 interface AuthToken {
   token: string;
@@ -13,6 +13,16 @@ interface AuthToken {
 
 let cachedToken: AuthToken | null = null;
 let tokenInitialized = false;
+
+/**
+ * Establece credenciales dinámicas para autenticación
+ */
+export const setAuthCredentials = (email: string, password: string): void => {
+  DEFAULT_EMAIL = email;
+  DEFAULT_PASSWORD = password;
+  cachedToken = null;
+  tokenInitialized = false;
+};
 
 /**
  * Inicializa el token de autenticación (llamar UNA SOLA VEZ al cargar la app)
@@ -39,6 +49,10 @@ export const getAuthToken = async (): Promise<string> => {
   if (cachedToken && cachedToken.expiresAt > Date.now()) {
      console.log('✅ Token obtenido del caché');
     return cachedToken.token;
+  }
+
+  if (!DEFAULT_EMAIL || !DEFAULT_PASSWORD) {
+    throw new Error('Credenciales no establecidas. Inicia sesión primero.');
   }
 
   try {

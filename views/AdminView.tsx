@@ -1,7 +1,9 @@
 
 import React, { useState } from 'react';
-import { ShieldCheck, UserPlus, Trash2, X, CheckCircle2, Circle } from 'lucide-react';
+import { ShieldCheck, UserPlus, Plus, Edit2, Trash2, Tag, X, ArrowUpCircle, ArrowDownCircle, AlertTriangle, CheckCircle2, Circle } from 'lucide-react';
 import { User, PermissionModule } from '../types';
+import { storage } from '../services/storage';
+
 
 interface Props {
   users: User[];
@@ -9,15 +11,29 @@ interface Props {
 }
 
 const AdminView: React.FC<Props> = ({ users, setUsers }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState<Omit<User, 'id' | 'avatar'>>({
+ const [isModalOpen, setIsModalOpen] = useState(false);
+ const [editingUser, setEditingUser] = useState<User | null>(null);
+ const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+ const [formData, setFormData] = useState({
+  
     email: '',
     name: '',
     role: 'user',
     permissions: []
   });
 
-  const handleTogglePermission = (module: PermissionModule) => {
+  const handleOpenModal = (item?: User) => {
+    if (item) {
+      setEditingUser(item);
+      setFormData({ name: item.name, email: item.email, role: item.role, permissions: item.permissions });
+    } else {
+      setEditingUser(null);
+      setFormData({ name: '', email: '', role: 'user', permissions: [] });
+    }
+    setIsModalOpen(true);
+  };
+
+    const handleTogglePermission = (module: PermissionModule) => {
     const current = [...formData.permissions];
     if (current.includes(module)) {
       setFormData({ ...formData, permissions: current.filter(m => m !== module) });
@@ -26,23 +42,66 @@ const AdminView: React.FC<Props> = ({ users, setUsers }) => {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUsers([...users, { 
-      id: crypto.randomUUID(), 
-      avatar: `https://picsum.photos/seed/${formData.email}/200`,
-      ...formData 
-    }]);
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar acceso para este usuario?')) {
-      setUsers(users.filter(u => u.id !== id));
+    
+    try {
+      if (editingUser) {
+        // Actualizar usuario existente
+        console.log('📝 Actualizando usuario:', editingUser.id);
+        await storage.updateUsers(editingUser.id, formData);
+        
+        // Actualizar estado local
+        setUsers(users.map(u => 
+          u.id === editingUser.id ? { ...u, ...formData } : u
+        ));
+        console.log('✅ Usuario actualizado correctamente');
+      } else {
+        // Crear nuevo usuario
+        console.log('➕ Creando nuevo usuario');
+        const newUser: User = {
+          id: crypto.randomUUID(),
+          ...formData
+        };
+        
+        // Intentar guardar en la API
+        await storage.saveUsers([...users, newUser]);
+        
+        // Si es exitoso, refrescar la lista desde la API
+        const updatedUsers = await storage.getUsers();
+        setUsers(updatedUsers);
+        
+        console.log('✅ Usuario creado correctamente');
+      }
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error('❌ Error al guardar usuario:', error);
+      const errorMessage = error.message || 'Error desconocido al guardar';
+      alert(errorMessage);
     }
   };
 
-  return (
+ const confirmDelete = async () => {
+    if (itemToDelete) {
+      try {
+        console.log('🗑️ Eliminando usuario:', itemToDelete);
+        await storage.deleteUsers(itemToDelete);
+        
+        // Actualizar estado local
+        const newUsers = users.filter(u => u.id !== itemToDelete);
+        setUsers(newUsers);
+        setItemToDelete(null);
+        
+        console.log('✅ Usuario eliminado correctamente');
+      } catch (error: any) {
+        console.error('❌ Error al eliminar usuario:', error);
+        const errorMessage = error.message || 'Error desconocido al eliminar';
+        alert(errorMessage);
+      }
+    }
+  };
+
+ return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -88,13 +147,21 @@ const AdminView: React.FC<Props> = ({ users, setUsers }) => {
               </div>
             </div>
 
-            <button 
+             <div className="flex items-center justify-end gap-2">
+
+              <button onClick={() => handleOpenModal(u)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Editar">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+
+                <button 
               disabled={u.role === 'admin' && users.filter(x => x.role === 'admin').length === 1}
-              onClick={() => handleDelete(u.id)} 
+              onClick={() => setItemToDelete(u.id)} 
               className="p-3 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:opacity-0"
             >
               <Trash2 className="w-5 h-5" />
             </button>
+              </div>
+
           </div>
         ))}
       </div>
@@ -161,8 +228,50 @@ const AdminView: React.FC<Props> = ({ users, setUsers }) => {
           </div>
         </div>
       )}
+
+       {itemToDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 animate-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-6">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            
+            <h3 className="text-xl font-bold text-slate-900 text-center mb-3">Eliminar Usuario</h3>
+            <p className="text-slate-600 text-center mb-8">
+              ¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.
+            </p>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setItemToDelete(null)}
+                className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-red-100"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default AdminView;
+const DetailItem: React.FC<{ icon: React.ReactNode, label: string, value: string }> = ({ icon, label, value }) => (
+  <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 hover:bg-indigo-50/50 transition-colors border border-transparent hover:border-indigo-100">
+    <div className="text-indigo-600 p-2.5 bg-white rounded-xl shadow-sm border border-slate-100">
+      {React.cloneElement(icon as React.ReactElement, { className: 'w-5 h-5' })}
+    </div>
+    <div>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+      <p className="text-slate-900 font-bold leading-tight mt-0.5">{value}</p>
+    </div>
+  </div>
+);
+
+export default AdminView;    

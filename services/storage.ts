@@ -38,7 +38,7 @@ export const storage = {
     try {
       const headers = await getAuthHeaders();
       const response = await fetch(`${API_URL}/ministries`, { headers });
-      
+      console.log('✅ `${API_URL}/ministries`, { headers }');
       if (!response.ok) {
         throw new Error(`Error fetching ministries: ${response.status}`);
       }
@@ -600,19 +600,125 @@ export const storage = {
     }
   },
 
-  // USUARIOS
-  getUsers: async (): Promise<User[]> => {
-    const data = localStorage.getItem('cp_users');
-    return data ? JSON.parse(data) : [{
-      id: 'admin-1',
-      email: 'admin@comunidad.pro',
-      name: 'Administrador Sistema',
-      role: 'admin',
-      permissions: Object.values(PermissionModule),
-      avatar: 'https://picsum.photos/seed/admin/200'
-    }];
+ // USUARIOS
+  getUserByEmail: async (email: string): Promise<User | null> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/users/email/${encodeURIComponent(email)}`, { headers });
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`Error fetching user by email: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result.data || null;
+    } catch (error) {
+      console.error('❌ Error getUserByEmail:', error);
+      return null;
+    }
   },
-  saveUsers: async (data: User[]) => {
-    localStorage.setItem('cp_users', JSON.stringify(data));
+  getUsers: async (): Promise<User[]> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/users`, { headers });
+
+      if (!response.ok) {
+        throw new Error(`Error fetching users: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Usuarios obtenidos:', result.data);
+      return result.data || [];
+    } catch (error) {
+      console.error('❌ Error getUsers:', error);
+      return JSON.parse(localStorage.getItem('cp_users') || '[]');
+    }
+  },
+
+
+saveUsers: async (data: User[]) => {
+    try {
+      const headers = await getAuthHeaders();
+
+      const newUsers = data.filter(u => u.id.includes('-'));
+      for (const user of newUsers) {
+        const payload = {
+          email: user.email,
+          name: (user as any).name,
+          role: user.role,
+          permissions: user.permissions,
+          avatar: user.avatar || 'avatar.jpg'
+        };
+
+        const response = await fetch(`${API_URL}/users`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || `Error saving user: ${response.status}`);
+        }
+      }
+
+      localStorage.setItem('cp_users', JSON.stringify(data));
+    } catch (error) {
+      console.error('❌ Error saveUsers:', error);
+      localStorage.setItem('cp_users', JSON.stringify(data));
+      throw error;
+    }
+  },
+
+    updateUsers: async (id: string, data: Partial<User>) => {
+    try {
+      const headers = await getAuthHeaders();
+      const payload = {
+        ...(data.email && { email: data.email }),
+        ...(data.name && { name: (data as any).name }),
+        ...(data.role && { role: data.role }),
+        ...(data.permissions && { permissions: data.permissions }),
+        ...(data.avatar !== undefined && { avatar: data.avatar })
+      };
+
+      const response = await fetch(`${API_URL}/users/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || `Error updating user: ${response.status}`);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('❌ Error updateUsers:', error);
+      throw error;
+    }
+  },
+
+  deleteUsers: async (id: string) => {
+    try {
+      const headers = await getAuthHeaders();
+
+      const response = await fetch(`${API_URL}/users/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error deleting user: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('❌ Error deleteUsers:', error);
+      throw error;
+    }
   }
+
 };
