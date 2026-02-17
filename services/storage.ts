@@ -2,7 +2,8 @@
 import { Ministry, Person, Category, Transaction, User, PermissionModule, SiteParameters } from '../types';
 import { getAuthHeaders } from './auth';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'https://backnoderestauracion-production.up.railway.app/api';
+//const API_URL = 'http://localhost:3001/api';
 
 export const storage = {
   // PARÁMETROS DEL SITIO

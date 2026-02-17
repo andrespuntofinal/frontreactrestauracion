@@ -42,7 +42,7 @@ const LandingView: React.FC<Props> = ({ params, onAdminAccess }) => {
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
             <Church className="w-6 h-6 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-slate-900">ComunidadPro</span>
+          <span className="text-xl font-bold tracking-tight text-slate-900">Restauración y Poder</span>
         </div>
         
         <button 
@@ -166,7 +166,7 @@ const LandingView: React.FC<Props> = ({ params, onAdminAccess }) => {
               <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
                 <Church className="w-6 h-6 text-white" />
               </div>
-              <span className="text-2xl font-bold">ComunidadPro</span>
+              <span className="text-2xl font-bold">Restauración y Poder</span>
             </div>
             <p className="text-slate-400 leading-relaxed">
               Trabajamos por una comunidad más unida, solidaria y llena de fe.

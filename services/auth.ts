@@ -11,6 +11,16 @@ interface AuthToken {
   expiresAt: number;
 }
 
+export class AuthError extends Error {
+  code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'AuthError';
+    this.code = code;
+  }
+}
+
 let cachedToken: AuthToken | null = null;
 let tokenInitialized = false;
 
@@ -80,7 +90,8 @@ export const getAuthToken = async (): Promise<string> => {
         statusText: response.statusText,
         error: data.error
       });
-      throw new Error(`Auth error ${response.status}: ${data.error?.message || response.statusText}`);
+      const code = data?.error?.message || response.statusText || 'UNKNOWN_AUTH_ERROR';
+      throw new AuthError(code, `Auth error ${response.status}: ${code}`);
     }
 
     console.log('✅ Token obtenido exitosamente:', data.idToken.substring(0, 20) + '...');

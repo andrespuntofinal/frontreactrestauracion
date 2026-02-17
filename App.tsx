@@ -26,12 +26,13 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  Loader2
+  Loader2,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { storage } from './services/storage';
 import { 
   User, 
-  PermissionModule, 
   Ministry, 
   Person, 
   Category, 
@@ -49,14 +50,23 @@ import ReportsView from './views/ReportsView';
 import LandingView from './views/LandingView';
 import SiteParamsView from './views/SiteParamsView';
 import { getFinancialInsights } from './services/gemini';
-import { setAuthCredentials, getAuthToken, clearAuthToken } from './services/auth';
+
+import { PermissionModule } from './types';
+
+import { AuthError, getAuthToken, setAuthCredentials } from './services/auth';
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'PUBLIC' | 'APP'>('PUBLIC');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<PermissionModule | 'HOME' | 'ASSISTANT'>('HOME');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Desktop toggle
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   // Global State
   const [ministries, setMinistries] = useState<Ministry[]>([]);
@@ -69,51 +79,52 @@ const App: React.FC = () => {
   const [loadingAi, setLoadingAi] = useState(false);
 
   useEffect(() => {
-    const loadSiteParams = async () => {
-      const s = await storage.getSiteParams();
-      setSiteParams(s);
-    };
-    loadSiteParams();
-  }, []);
-
-  useEffect(() => {
-    const loadProtectedData = async () => {
-      if (!currentUser) return;
+    const loadData = async () => {
+       if (!currentUser || viewMode !== 'APP') return;
       setIsSyncing(true);
-      const [m, p, c, t, u] = await Promise.all([
+      const [m, p, c, t, u, s] = await Promise.all([
         storage.getMinistries(),
         storage.getPeople(),
         storage.getCategories(),
         storage.getTransactions(),
-        storage.getUsers()
+        storage.getUsers(),
+        storage.getSiteParams()
       ]);
       setMinistries(m);
       setPeople(p);
       setCategories(c);
       setTransactions(t);
       setUsers(u);
+      setSiteParams(s);
       setIsSyncing(false);
     };
-    loadProtectedData();
-  }, [currentUser]);
+    loadData();
+  }, [currentUser, viewMode]);
 
-  const handleLogin = async (email: string, password: string) => {
-    setAuthCredentials(email, password);
-    await getAuthToken();
+const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setLoginLoading(true);
 
-    const found = await storage.getUserByEmail(email);
-    if (!found) {
-      clearAuthToken();
-      throw new Error('Usuario no encontrado en la base de datos');
+    try {
+      // TODO: aquí vamos a llamar Firebase + API users/email en el siguiente paso
+      const apiUser = await storage.getUserByEmail(loginEmail);
+      if (!apiUser) throw new Error('Usuario no encontrado');
+      const normalizedUser = {
+  ...apiUser,
+  permissions: normalizePermissions(apiUser.permissions as unknown as string[])
+};
+      setCurrentUser(normalizedUser);
+      setViewMode('APP');
+      setActiveTab('HOME');
+    } catch (error: any) {
+      setLoginError(error?.message || 'Error al iniciar sesión');
+    } finally {
+      setLoginLoading(false);
     }
-
-    setCurrentUser(found);
-    setViewMode('APP');
-    setActiveTab('HOME');
   };
 
   const handleLogout = () => {
-    clearAuthToken();
     setCurrentUser(null);
     setViewMode('PUBLIC');
     setActiveTab('HOME');
@@ -132,6 +143,22 @@ const App: React.FC = () => {
     return currentUser.permissions.includes(module);
   };
 
+  const normalizePermissions = (perms: string[]): PermissionModule[] => {
+  const map: Record<string, PermissionModule> = {
+    'Ministerios': PermissionModule.MINISTRIES,
+    'Personas': PermissionModule.PEOPLE,
+    'Categorías': PermissionModule.CATEGORIES,
+    'Transacciones': PermissionModule.TRANSACTIONS,
+    'Reportes': PermissionModule.REPORTS,
+    'Administración': PermissionModule.ADMIN,
+    'Parámetros sitio': PermissionModule.SITE_PARAMS,
+  };
+
+  return perms
+    .map(p => map[p.trim()])
+    .filter(Boolean) as PermissionModule[];
+};
+
   const birthdaysToday = useMemo(() => {
     const today = new Date();
     const todayDay = today.getDate();
@@ -147,16 +174,12 @@ const App: React.FC = () => {
   const renderModule = () => {
     switch (activeTab) {
       case PermissionModule.MINISTRIES:
-        if (!hasAccess(PermissionModule.MINISTRIES)) return <HomeDashboard />;
         return <MinistriesView ministries={ministries} setMinistries={async (m) => { setMinistries(m); await storage.saveMinistries(m); }} />;
       case PermissionModule.PEOPLE:
-        if (!hasAccess(PermissionModule.PEOPLE)) return <HomeDashboard />;
         return <PeopleView people={people} setPeople={async (p) => { setPeople(p); await storage.savePeople(p); }} ministries={ministries} />;
       case PermissionModule.CATEGORIES:
-        if (!hasAccess(PermissionModule.CATEGORIES)) return <HomeDashboard />;
         return <CategoriesView categories={categories} setCategories={async (c) => { setCategories(c); await storage.saveCategories(c); }} />;
       case PermissionModule.TRANSACTIONS:
-        if (!hasAccess(PermissionModule.TRANSACTIONS)) return <HomeDashboard />;
         return <TransactionsView 
           transactions={transactions} 
           setTransactions={async (t) => { setTransactions(t); await storage.saveTransactions(t); }} 
@@ -164,13 +187,10 @@ const App: React.FC = () => {
           people={people} 
         />;
       case PermissionModule.REPORTS:
-        if (!hasAccess(PermissionModule.REPORTS)) return <HomeDashboard />;
         return <ReportsView transactions={transactions} people={people} categories={categories} ministries={ministries} />;
       case PermissionModule.ADMIN:
-        if (!hasAccess(PermissionModule.ADMIN)) return <HomeDashboard />;
         return <AdminView users={users} setUsers={async (u) => { setUsers(u); await storage.saveUsers(u); }} />;
       case PermissionModule.SITE_PARAMS:
-        if (!hasAccess(PermissionModule.SITE_PARAMS)) return <HomeDashboard />;
         return siteParams ? <SiteParamsView params={siteParams} setParams={async (s) => { setSiteParams(s); await storage.saveSiteParams(s); }} /> : null;
       case 'ASSISTANT':
         return <AssistantView people={people} ministries={ministries} transactions={transactions} categories={categories} />;
@@ -272,14 +292,43 @@ const App: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      const normalizedEmail = email.trim();
+
       try {
-        await handleLogin(email, password);
-      } catch (loginError: any) {
-        setError(loginError?.message || 'Correo o contraseña incorrectos');
+        setLoginEmail(normalizedEmail);
+        setLoginPassword(password);
+        await handleLoginWithCredentials(normalizedEmail, password);
+            } catch (err: any) {
+        const raw =
+          err instanceof AuthError
+            ? err.code
+            : String(err?.message || err?.toString?.() || '');
+        const code = raw.toUpperCase();
+
+        if (code.includes('INVALID_LOGIN_CREDENTIALS')) {
+          setError('Credenciales inválidas. Verifica tu correo y contraseña.');
+        } else {
+          setError(err?.message || 'Error al iniciar sesión.');
+        }
       } finally {
         setLoading(false);
       }
     };
+
+const handleLoginWithCredentials = async (email: string, password: string) => {
+  
+  setAuthCredentials(email, password);
+  await getAuthToken();
+  const apiUser = await storage.getUserByEmail(email);
+  if (!apiUser) throw new Error('Usuario no encontrado');
+  const normalizedUser = {
+    ...apiUser,
+    permissions: normalizePermissions(apiUser.permissions as unknown as string[])
+  };
+  setCurrentUser(normalizedUser);
+  setViewMode('APP');
+  setActiveTab('HOME');
+};
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans relative overflow-hidden">
@@ -300,7 +349,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="text-center mb-10">
-            <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">ComunidadPro</h1>
+            <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Restauración y Poder</h1>
             <p className="text-slate-500 font-medium">Ingresa tus credenciales para continuar</p>
           </div>
           
@@ -386,28 +435,52 @@ const App: React.FC = () => {
     );
   };
 
-  if (viewMode === 'PUBLIC') {
-    return siteParams ? <LandingView params={siteParams} onAdminAccess={() => setViewMode('APP')} /> : <div className="min-h-screen bg-white" />;
+  if (viewMode === 'PUBLIC' && siteParams) {
+    return <LandingView params={siteParams} onAdminAccess={() => setViewMode('APP')} />;
   }
 
   if (!currentUser) return <LoginScreen />;
 
   return (
-    <div className="min-h-screen flex bg-slate-50">
+   <div className="min-h-[100dvh] flex bg-slate-50 overflow-hidden">
+      {/* Mobile Drawer Backdrop */}
       {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-full flex flex-col p-6">
-          <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center"><Church className="w-6 h-6 text-white" /></div>
-            <span className="text-xl font-bold text-slate-900">ComunidadPro</span>
+      {/* Sidebar Colapsable */}
+      
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transition-all duration-300
+        ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'}
+        ${!isSidebarOpen && (isSidebarCollapsed ? 'md:w-20' : 'md:w-64')}
+      `}>
+        <div className="h-full flex flex-col p-4">
+          <div className={`flex items-center gap-3 mb-8 px-2 ${isSidebarCollapsed && !isSidebarOpen ? 'justify-center' : ''}`}>
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-100">
+              <Church className="w-6 h-6 text-white" />
+            </div>
+            {(!isSidebarCollapsed || isSidebarOpen) && <span className="text-xl font-black text-slate-900 truncate">ComunidadPro</span>}
           </div>
 
-          <nav className="flex-1 space-y-1.5 overflow-y-auto pr-2 custom-scrollbar">
-            <NavItem icon={<HomeIcon />} label="Inicio" active={activeTab === 'HOME'} onClick={() => {setActiveTab('HOME'); setIsSidebarOpen(false);}} />
-            <NavItem icon={<MessageSquareText />} label="Asistente IA" active={activeTab === 'ASSISTANT'} onClick={() => {setActiveTab('ASSISTANT'); setIsSidebarOpen(false);}} />
+          <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1">
+            <NavItem 
+              icon={<HomeIcon />} 
+              label="Inicio" 
+              active={activeTab === 'HOME'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen} 
+              onClick={() => {setActiveTab('HOME'); setIsSidebarOpen(false);}} 
+            />
+            <NavItem 
+              icon={<MessageSquareText />} 
+              label="Asistente IA" 
+              active={activeTab === 'ASSISTANT'} 
+              collapsed={isSidebarCollapsed && !isSidebarOpen} 
+              onClick={() => {setActiveTab('ASSISTANT'); setIsSidebarOpen(false);}} 
+            />
             
-            <div className="pt-6 pb-2 px-2 uppercase text-[10px] font-bold text-slate-400 tracking-widest">Gestión</div>
+            {(!isSidebarCollapsed || isSidebarOpen) && (
+              <div className="pt-6 pb-2 px-3 uppercase text-[10px] font-bold text-slate-400 tracking-widest">Gestión</div>
+            )}
+            
             {Object.values(PermissionModule).map(module => (
               hasAccess(module) && (
                 <NavItem 
@@ -423,30 +496,48 @@ const App: React.FC = () => {
                   } 
                   label={module} 
                   active={activeTab === module} 
+                  collapsed={isSidebarCollapsed && !isSidebarOpen} 
                   onClick={() => {setActiveTab(module); setIsSidebarOpen(false);}} 
                 />
               )
             ))}
           </nav>
 
-          <div className="mt-auto pt-6 border-t border-slate-100 space-y-4">
-            <div className="flex items-center gap-3 px-3 py-1.5 bg-green-50 text-green-700 rounded-xl text-[10px] font-bold">
-              <CloudCheck className="w-3.5 h-3.5" /> MODO PERSISTENCIA
-            </div>
-            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all font-medium">
-              <LogOut className="w-5 h-5" /> Cerrar Sesión
+          <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+              className={`hidden md:flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-bold text-xs ${isSidebarCollapsed ? 'justify-center' : ''}`}
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <><PanelLeftClose className="w-5 h-5" /> Colapsar</>}
+            </button>
+            <button onClick={handleLogout} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all font-bold text-xs ${isSidebarCollapsed && !isSidebarOpen ? 'justify-center' : ''}`}>
+              <LogOut className="w-5 h-5" /> {(!isSidebarCollapsed || isSidebarOpen) && 'Cerrar Sesión'}
             </button>
           </div>
         </div>
       </aside>
 
+            {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-slate-200 md:hidden">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600"><Menu className="w-6 h-6" /></button>
-          <span className="font-bold text-slate-900">ComunidadPro</span>
-          <div className="w-8" />
+        <header className="h-16 flex items-center justify-between px-4 md:px-6 bg-white border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600 md:hidden hover:bg-slate-50 rounded-lg">
+              <Menu className="w-6 h-6" />
+            </button>
+            <span className="font-black text-slate-900 md:text-lg">
+              {activeTab === 'HOME' ? 'Dashboard' : activeTab}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+             <div className="hidden sm:flex flex-col items-end">
+               <span className="text-xs font-black text-slate-900">{currentUser.name}</span>
+               <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tighter">{currentUser.role}</span>
+             </div>
+             <img src={currentUser.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-xl object-cover ring-2 ring-indigo-50" alt="" />
+          </div>
         </header>
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
+
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 custom-scrollbar bg-slate-50">
           <div className="max-w-6xl mx-auto">{renderModule()}</div>
         </div>
       </main>
@@ -454,10 +545,21 @@ const App: React.FC = () => {
   );
 };
 
-const NavItem = ({ icon, label, active, onClick }: any) => (
-  <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500 hover:bg-indigo-50 hover:text-indigo-600'}`}>
-    {React.cloneElement(icon, { className: 'w-5 h-5' })} {label}
+const NavItem = ({ icon, label, active, onClick, collapsed }: any) => (
+  <button 
+    onClick={onClick} 
+    title={collapsed ? label : ''}
+    className={`
+      w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-bold text-sm
+      ${active 
+        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
+        : 'text-slate-500 hover:bg-indigo-50 hover:text-indigo-600'
+      }
+      ${collapsed ? 'justify-center' : ''}
+    `}
+  >
+    {React.cloneElement(icon, { className: 'w-5 h-5 flex-shrink-0' })} 
+    {!collapsed && <span className="truncate">{label}</span>}
   </button>
 );
-
 export default App;

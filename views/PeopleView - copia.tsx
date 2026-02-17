@@ -457,23 +457,14 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
 
       {/* Formulario de Registro/Edición ajustado */}
       {isModalOpen && (
-       <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center md:p-4 overflow-hidden animate-in fade-in duration-300">
-      <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-4xl md:rounded-[3rem] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar">
-        
-        <div className="relative h-40 md:h-20 bg-gradient-to-br from-indigo-600 to-blue-200 shrink-0 grid place-items-center">
-    
-          <h3 className="text-2xl md:text-3xl font-semibold text-white tracking-wide drop-shadow-sm">
-            {editingItem ? 'EDITAR PERFIL' : 'NUEVO PERFIL'}
-          </h3>
-    
-          <button
-            onClick={() => setIsModalOpen(false)}
-            aria-label="Cerrar modal"
-            className="absolute top-4 right-4 p-2 text-slate-600 hover:text-black rounded-lg transition"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center md:p-4 overflow-hidden animate-in fade-in duration-300">
+          <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-3xl md:rounded-[2.5rem] flex flex-col shadow-2xl animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300">
+            <div className="flex items-center justify-between p-6 md:p-8 border-b border-slate-100 sticky top-0 bg-white z-20">
+              <h3 className="text-2xl font-bold text-slate-900">{editingItem ? 'Editar Perfil' : 'Crear Perfil'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="hidden md:block p-2 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
             
                         {/* Body Scrollable */}
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar">
