@@ -337,22 +337,22 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
         <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-violet-100/50 rounded-full blur-3xl animate-pulse" />
 
         <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-10 border border-slate-100 relative z-10 animate-in zoom-in-95 duration-300">
-          <button 
-            onClick={() => setViewMode('PUBLIC')} 
-            className="mb-8 text-slate-400 hover:text-indigo-600 flex items-center gap-2 mx-auto font-bold text-sm transition-colors"
-          >
-            &larr; Volver al sitio público
-          </button>
+ 
 
-          <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-200">
-            <Church className="w-12 h-12 text-white" />
-          </div>
-
-          <div className="text-center mb-10">
-            <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Restauración y Poder</h1>
-            <p className="text-slate-500 font-medium">Ingresa tus credenciales para continuar</p>
-          </div>
+          <div className="w-30 h-30 bg-white rounded-[2rem] flex items-center justify-center">
+          <img
+            src="https://lh3.googleusercontent.com/pw/AP1GczO2h8HUXvW83XeacGoZGj3V366ohT8Zp7XzN1v4Xk7DzSrswY5i00-8GlWXIwMluxM-yZw3oqOZHjDRPiUJfYEMthtlLjF63JMkVihj9VayuArZQhRK9DrIb1UrFq-Joy3GCd67HZTr2IQqv91jNs6KZA=w1259-h839-s-no-gm?authuser=0"
+            alt="Church"
+            className="w-42 h-32 object-cover rounded-[1.5rem] shadow-lg shadow-blue-500"
+          />
           
+        </div>     
+                   <div className="text-center mb-10 mt-6">
+            
+            <h1 className="text-2xl font-bold text-slate-400">PANEL DE CONTROL</h1>
+           
+          </div>
+                     
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-sm font-bold animate-in slide-in-from-top-2">
@@ -427,9 +427,12 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
             </button>
           </form>
 
-          <p className="mt-10 text-center text-slate-400 text-sm font-medium">
-            ¿No tienes cuenta? <button className="text-indigo-600 font-bold">Contáctanos</button>
-          </p>
+         <button 
+            onClick={() => setViewMode('PUBLIC')} 
+            className="mb-8 text-slate-400 hover:text-indigo-600 flex items-center gap-2 mx-auto font-bold text-sm transition-colors mt-6"
+          >
+            &larr; Volver al sitio público
+          </button>
         </div>
       </div>
     );
@@ -455,10 +458,15 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
       `}>
         <div className="h-full flex flex-col p-4">
           <div className={`flex items-center gap-3 mb-8 px-2 ${isSidebarCollapsed && !isSidebarOpen ? 'justify-center' : ''}`}>
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-100">
-              <Church className="w-6 h-6 text-white" />
-            </div>
-            {(!isSidebarCollapsed || isSidebarOpen) && <span className="text-xl font-black text-slate-900 truncate">Restauración</span>}
+                     <div className="w-30 h-30 bg-white rounded-[2rem] flex items-center justify-center">
+          <img
+            src="https://lh3.googleusercontent.com/pw/AP1GczO2h8HUXvW83XeacGoZGj3V366ohT8Zp7XzN1v4Xk7DzSrswY5i00-8GlWXIwMluxM-yZw3oqOZHjDRPiUJfYEMthtlLjF63JMkVihj9VayuArZQhRK9DrIb1UrFq-Joy3GCd67HZTr2IQqv91jNs6KZA=w1259-h839-s-no-gm?authuser=0"
+            alt="Church"
+            className="w-42 h-32 object-cover rounded-[1.5rem] shadow-lg shadow-blue-500"
+          />
+          
+        </div>  
+            {(!isSidebarCollapsed || isSidebarOpen) && <span className="text-xl font-black text-slate-900 truncate"></span>}
           </div>
 
           <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1">
