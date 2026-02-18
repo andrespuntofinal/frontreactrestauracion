@@ -40,7 +40,7 @@ const ReportsView: React.FC<Props> = ({ transactions, people, categories, minist
     return categories.filter(c => c.type === selectedType);
   }, [categories, selectedType]);
 
-  // Lógica de Filtrado Financiero
+  // Lógica de   Financiero
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
       const dateMatch = (!startDate || t.date >= startDate) && (!endDate || t.date <= endDate);
@@ -201,7 +201,7 @@ const ReportsView: React.FC<Props> = ({ transactions, people, categories, minist
                       <td className="px-6 py-4">
                         <div className="text-sm font-bold text-slate-900">{categories.find(c => c.id === t.categoryId)?.name}</div>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          {t.paymentMethod === PaymentMethod.CASH ? (
+                          {t.medioTrx === PaymentMethod.CASH ? (
                             <span className="text-[9px] font-bold text-amber-600 uppercase bg-amber-50 px-1 py-0.5 rounded">Efectivo</span>
                           ) : (
                             <span className="text-[9px] font-bold text-blue-600 uppercase bg-blue-50 px-1 py-0.5 rounded">Transferencia</span>
@@ -310,6 +310,7 @@ const ReportsView: React.FC<Props> = ({ transactions, people, categories, minist
   );
 };
 
+// Fixed the TypeScript error by casting the icon element to React.ReactElement<any> to allow the className prop in cloneElement.
 const StatCard = ({ title, value, icon, color }: any) => (
   <div className={`p-6 rounded-3xl border border-slate-200 bg-white flex items-center justify-between shadow-sm animate-in slide-in-from-bottom-4 duration-500`}>
     <div>
@@ -317,7 +318,7 @@ const StatCard = ({ title, value, icon, color }: any) => (
       <p className="text-3xl font-black text-slate-900">{value}</p>
     </div>
     <div className={`p-4 rounded-2xl ${color} shadow-inner`}>
-      {React.cloneElement(icon as React.ReactElement, { className: 'w-8 h-8' })}
+      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-8 h-8' })}
     </div>
   </div>
 );

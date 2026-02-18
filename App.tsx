@@ -411,7 +411,8 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:translate-y-0"
+              className="w-full bg-[#217b83] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-[#00555C]/30 hover:bg-[#00454b] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:translate-y-0"
+
             >
               {loading ? (
                 <>
@@ -420,7 +421,7 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
                 </>
               ) : (
                 <>
-                  Ingresar al Panel
+                  Ingresar
                   <ChevronRight className="w-6 h-6" />
                 </>
               )}
@@ -456,7 +457,7 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
         ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'}
         ${!isSidebarOpen && (isSidebarCollapsed ? 'md:w-20' : 'md:w-64')}
       `}>
-        <div className="h-full flex flex-col p-4">
+        <div className="h-full flex flex-col p-4 bg-[#c9d1d2]">
           <div className={`flex items-center gap-3 mb-8 px-2 ${isSidebarCollapsed && !isSidebarOpen ? 'justify-center' : ''}`}>
                      <div className="w-30 h-30 bg-white rounded-[2rem] flex items-center justify-center">
           <img
@@ -558,13 +559,14 @@ const NavItem = ({ icon, label, active, onClick, collapsed }: any) => (
     onClick={onClick} 
     title={collapsed ? label : ''}
     className={`
-      w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-bold text-sm
-      ${active 
-        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
-        : 'text-slate-500 hover:bg-indigo-50 hover:text-indigo-600'
-      }
-      ${collapsed ? 'justify-center' : ''}
-    `}
+    w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-bold text-sm
+    focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00555C]
+    ${active 
+    ? 'bg-[#00555C] text-white shadow-lg shadow-[#00555C]/30' 
+    : 'text-slate-500 hover:bg-[#00555C]/10 hover:text-[#00555C]'
+    }
+  ${collapsed ? 'justify-center' : ''}
+`}
   >
     {React.cloneElement(icon, { className: 'w-5 h-5 flex-shrink-0' })} 
     {!collapsed && <span className="truncate">{label}</span>}
