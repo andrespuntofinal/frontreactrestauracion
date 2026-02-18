@@ -201,8 +201,8 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
             <thead className="bg-slate-50/50">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Persona</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Identificación</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Membresía</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Ministerio</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Dirección</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Estado</th>
                 <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Acciones</th>
               </tr>
@@ -228,17 +228,21 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       </div>
                       <div>
                         <div className="font-bold text-slate-900">{p.fullName}</div>
-                        <div className="text-xs text-slate-400">{p.email || 'Sin email'}</div>
+                        <div className="text-xs text-slate-400">{p.phone || 'Sin celular'}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-700">{p.idType}: {p.identification}</div>
+                    <div className="text-sm font-medium text-slate-700">{ministries.find(m => m.id === p.ministryId)?.name || 'General'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700">
-                      {p.membershipType}
-                    </span>
+                  <div className="flex items-center gap-4">
+                  <Maximize2 className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                  <div className="font-bold text-slate-900">{p.address}</div>
+                  <div className="text-xs text-slate-400">{p.neighborhood}</div>
+                  </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold ${
@@ -358,8 +362,8 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
       {/* Perfil Detallado (Rediseñado según solicitud) */}
       {viewingItem && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center md:p-4 overflow-hidden animate-in fade-in duration-300">
-           <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-4xl md:rounded-[3rem] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar">
-              <div className="relative h-40 md:h-56 bg-gradient-to-br from-indigo-600 to-violet-700 shrink-0">
+        <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-4xl md:rounded-[3rem] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar">
+        <div className="relative h-40 md:h-20 bg-gradient-to-br from-indigo-600 to-blue-200 shrink-0 grid place-items-center">
               <button 
                 onClick={() => setViewingItem(null)}
                 className="absolute top-4 sm:top-6 right-4 sm:right-6 p-2 bg-white/20 hover:bg-white/40 text-white rounded-full transition-all"

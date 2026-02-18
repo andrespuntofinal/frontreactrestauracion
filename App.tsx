@@ -458,7 +458,7 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-100">
               <Church className="w-6 h-6 text-white" />
             </div>
-            {(!isSidebarCollapsed || isSidebarOpen) && <span className="text-xl font-black text-slate-900 truncate">ComunidadPro</span>}
+            {(!isSidebarCollapsed || isSidebarOpen) && <span className="text-xl font-black text-slate-900 truncate">Restauración</span>}
           </div>
 
           <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1">
