@@ -343,7 +343,7 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
           <img
             src="https://lh3.googleusercontent.com/pw/AP1GczO2h8HUXvW83XeacGoZGj3V366ohT8Zp7XzN1v4Xk7DzSrswY5i00-8GlWXIwMluxM-yZw3oqOZHjDRPiUJfYEMthtlLjF63JMkVihj9VayuArZQhRK9DrIb1UrFq-Joy3GCd67HZTr2IQqv91jNs6KZA=w1259-h839-s-no-gm?authuser=0"
             alt="Church"
-            className="w-42 h-32 object-cover rounded-[1.5rem] shadow-lg shadow-blue-500"
+            className="w-42 h-32 object-cover rounded-[1.5rem] shadow-lg shadow-[#00555C]/50"
           />
           
         </div>     
@@ -461,9 +461,9 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
           <div className={`flex items-center gap-3 mb-8 px-2 ${isSidebarCollapsed && !isSidebarOpen ? 'justify-center' : ''}`}>
                      <div className="w-30 h-30 bg-white rounded-[2rem] flex items-center justify-center">
           <img
-            src="https://lh3.googleusercontent.com/pw/AP1GczO2h8HUXvW83XeacGoZGj3V366ohT8Zp7XzN1v4Xk7DzSrswY5i00-8GlWXIwMluxM-yZw3oqOZHjDRPiUJfYEMthtlLjF63JMkVihj9VayuArZQhRK9DrIb1UrFq-Joy3GCd67HZTr2IQqv91jNs6KZA=w1259-h839-s-no-gm?authuser=0"
+            src="https://scontent.fbog11-1.fna.fbcdn.net/v/t39.30808-6/638317679_1237645808553472_5646321563120863889_n.jpg?_nc_cat=106&ccb=1-7&_nc_sid=13d280&_nc_ohc=4-JBcyAChEUQ7kNvwGAMptW&_nc_oc=AdmcGrOx9RkX2_sOLolxUFNXigshqsZjUud5SXFGgYigSFwNzdHHj2qLPEGMehplOJiQJAFfmXJbj7UtA28N09Qy&_nc_zt=23&_nc_ht=scontent.fbog11-1.fna&_nc_gid=MpR0no6siyH4f8s74QDdoQ&oh=00_Aft5L7KmbCHIezNeoS0jjDIzhBXa7NvZu7sTfqiuUYl5YA&oe=699CEE5C"
             alt="Church"
-            className="w-42 h-32 object-cover rounded-[1.5rem] shadow-lg shadow-blue-500"
+            className="w-42 h-32 object-cover rounded-[1.5rem] shadow-xl shadow-[#00555C]/30 hover:shadow-2xl hover:shadow-[#00555C]/50 transition-all duration-300"
           />
           
         </div>  
