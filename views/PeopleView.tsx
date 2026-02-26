@@ -737,7 +737,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
       {isModalOpen && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center md:p-4 overflow-hidden animate-in fade-in duration-300">
           <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-4xl md:rounded-[3rem] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar">
-            <div className="relative h-40 md:h-20 bg-gradient-to-br from-[#00555C] via-[#217b83] to-[#044ac3] shrink-0 grid place-items-center">
+            <div className="relative h-40 md:h-20 bg-gradient-to-br from-[#00555C] via-[#217b83] to-[#FFFFFF] shrink-0 grid place-items-center">
               <h3 className="text-2xl md:text-3xl font-semibold text-white tracking-wide drop-shadow-md">
                 {editingItem ? "EDITAR PERFIL" : "NUEVO PERFIL"}
               </h3>
@@ -853,7 +853,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -889,7 +889,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -920,7 +920,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -951,7 +951,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -982,7 +982,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -1013,7 +1013,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -1043,7 +1043,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -1084,7 +1084,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -1114,7 +1114,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 
@@ -1150,7 +1150,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                       bg-[#00555C]/10
                       border border-[#c9d1d2]
                       rounded-xl
-                      text-sm font-semibold text-[#00555c]
+                      text-sm font-semibold text-[#000000]
                       outline-none
                       transition-all duration-200
 

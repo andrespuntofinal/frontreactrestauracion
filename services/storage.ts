@@ -1,6 +1,7 @@
 
 import { Ministry, Person, Category, Transaction, User, PermissionModule, SiteParameters } from '../types';
 import { getAuthHeaders } from './auth';
+import { getAuthToken } from './auth';
 
 const API_URL = 'https://backnoderestauracion-production.up.railway.app/api';
 //const API_URL = 'http://localhost:3001/api';
@@ -162,6 +163,96 @@ export const storage = {
       throw error;
     }
   },
+
+  // ARCHIVOS
+  // 📤 Subir archivo
+   uploadFile: async (file: File): Promise<{ publicId: string; url: string; fileName: string }> => {
+    try {
+      const token = await getAuthToken();
+      
+      if (!token) {
+        throw new Error('❌ Token de autenticación no encontrado');
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      console.log('📤 Subiendo archivo:', file.name);
+
+      const response = await fetch(`${API_URL}/files`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // No incluir Content-Type para FormData
+        },
+        body: formData
+      });
+
+     
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Respuesta del servidor:', errorData);
+        throw new Error(`❌ Error uploading file: ${response.status} - ${errorData.message || 'Sin detalles'}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Archivo subido correctamente:', result);
+
+      // Normalizar la respuesta según lo que devuelva tu API
+      return {
+        publicId: result.data?.publicId || result.publicId || result.id || '',
+        url: result.data?.url || result.url || '',
+        fileName: result.data?.fileName || result.fileName || file.name
+      };
+
+    } catch (error) {
+      console.error('❌ Error uploadFile:', error);
+      throw error;
+    }
+  },
+
+  deleteFile: async (fileId: string): Promise<{ success: boolean }> => {
+  try {
+    const token = await getAuthToken();
+
+    if (!token) {
+      throw new Error('❌ Token de autenticación no encontrado');
+    }
+
+    console.log('🗑️ Eliminando archivo con ID:', fileId);
+
+    const response = await fetch(`${API_URL}/files/${encodeURIComponent(fileId)}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Respuesta del servidor:', errorData);
+
+      throw new Error(
+        `❌ Error deleting file: ${response.status} - ${
+          errorData.message || 'Sin detalles'
+        }`
+      );
+    }
+
+    const result = await response.json();
+
+    console.log('✅ Archivo eliminado:', result);
+
+    return {
+      success: result.success ?? true
+    };
+
+  } catch (error) {
+    console.error('❌ Error deleteFile:', error);
+    throw error;
+  }
+},
 
   // PERSONAS
   getPeople: async (): Promise<Person[]> => {
@@ -489,7 +580,7 @@ export const storage = {
         transaction.id.includes('-')
       );
       
-      console.log('✨ Nuevas transacciones a enviar a API:', newTransactions);
+      console.log('✨ Nuevas transacciones a enviar a API:', data);
       
       let result;
       // Enviar solo las nuevas
@@ -509,7 +600,7 @@ export const storage = {
           payload.personId = transaction.personId;
         }
         
-        console.log('📤 Enviando transacción:', payload);
+        console.log('📤 Enviando transacción nesssss:', payload);
         
         const response = await fetch(`${API_URL}/transactions`, {
           method: 'POST',

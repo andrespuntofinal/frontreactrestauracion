@@ -453,10 +453,10 @@ const TransactionsView: React.FC<Props> = ({
       </div>
 
       {isModalOpen && (
-         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center md:p-4 overflow-hidden animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center md:p-4 overflow-hidden animate-in fade-in duration-300">
           <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-4xl md:rounded-[3rem] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar">
-            <div className="relative h-40 md:h-20 bg-gradient-to-br from-[#00555C] via-[#217b83] to-[#FFFFFF] shrink-0 grid place-items-center">
-              <h3 className="text-2xl md:text-3xl font-semibold text-white tracking-wide drop-shadow-md">
+            <div className="relative h-40 md:h-20 bg-gradient-to-br from-indigo-600 to-blue-200 shrink-0 grid place-items-center">
+              <h3 className="text-2xl md:text-3xl font-semibold text-white tracking-wide drop-shadow-sm">
                 {editingItem ? "EDITAR TRANSACCIÓN" : "NUEVA TRANSACCIÓN"}
               </h3>
 
@@ -644,34 +644,13 @@ const TransactionsView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="
-      order-2 md:order-1 flex-1 py-4
-      rounded-2xl font-semibold
-      text-slate-600
-      border border-slate-200
-      hover:bg-slate-50 hover:border-slate-300
-      active:scale-[0.98]
-      transition-all duration-200
-      focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300
-    "
+                  className="px-8 py-3 text-slate-600 font-bold hover:bg-slate-50 rounded-2xl transition-all"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="
-      order-1 md:order-2 flex-[2]
-      bg-[#00555C] text-white py-4 rounded-2xl
-      font-bold tracking-wide
-      shadow-lg shadow-[#00555C]/30
-      hover:bg-[#00454b]
-      hover:shadow-xl hover:shadow-[#00555C]/40
-      hover:-translate-y-[1px]
-      active:scale-[0.97]
-      transition-all duration-300 ease-out
-      flex items-center justify-center gap-2
-      focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00555C]/50
-    "
+                  className="bg-indigo-600 text-white px-12 py-3 rounded-2xl font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
                 >
                   {editingItem ? "Guardar Cambios" : "Registrar"}
                 </button>
