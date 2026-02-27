@@ -52,7 +52,6 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
   const [viewingItem, setViewingItem] = useState<Person | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null); // ← AGREGAR
   const [currentPage, setCurrentPage] = useState(1); // ← AGREGAR ESTO
   const itemsPerPage = 5; // ← AGREGAR ESTO
   const activeMinistries = ministries.filter(
@@ -135,21 +134,6 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
     const timer = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(timer);
   }, [toast]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // No cerrar si clickeó en el botón o dentro del menú
-      if (!target.closest('[data-menu-button]') && !target.closest('[data-menu-content]')) {
-        setOpenMenuId(null);
-      }
-    };
-    
-    if (openMenuId) {
-      document.addEventListener('click', handleClickOutside);
-    }
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [openMenuId]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,11 +264,6 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
               <tr>
                 <th className="px-6 py-5 text-left">
                   <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
-                    --
-                  </span>
-                </th>
-                <th className="px-6 py-5 text-left">
-                  <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
                     Persona
                   </span>
                 </th>
@@ -298,6 +277,11 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                     Dirección
                   </span>
                 </th>
+                <th className="px-6 py-5 text-right">
+                  <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
+                    Acciones
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -306,62 +290,6 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                   key={p.id}
                   className="group hover:bg-[#217b83]/5 transition-colors duration-200"
                 >
-                  <td className="px-6 py-5 whitespace-nowrap">
-                    <div className="relative">
-                      <button
-                        data-menu-button onClick={() => setOpenMenuId(openMenuId === p.id ? null : p.id)}
-                        className="
-                          p-2.5 text-slate-800
-                          bg-white border border-[#c9d1d2]
-                          hover:text-slate-800
-                          hover:border-[#217b83] hover:bg-[#217b83]/5
-                          rounded-xl transition-all duration-300
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-[#217b83]/40
-                        "
-                        title="Más opciones"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10.5 1.5H9.5V3.5H10.5V1.5ZM10.5 8.5H9.5V10.5H10.5V8.5ZM10.5 15.5H9.5V17.5H10.5V15.5Z" />
-                        </svg>
-                      </button>
-
-                      {/* Dropdown Menu */}
-                      {openMenuId === p.id && (
-                        <div data-menu-content className="absolute left-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[90] animate-in fade-in zoom-in-95 duration-200">
-                          <button
-                            onClick={() => {
-                              setViewingItem(p);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-[#217b83] flex items-center gap-3 border-b border-slate-100 rounded-t-2xl first:rounded-t-2xl transition-colors font-medium text-sm"
-                          >
-                            <Eye className="w-4 h-4" />
-                            Visualizar
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleOpenModal(p);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-[#044ac3] flex items-center gap-3 border-b border-slate-100 transition-colors font-medium text-sm"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => {
-                              setItemToDelete(p.id);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 flex items-center gap-3 rounded-b-2xl transition-colors font-medium text-sm"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Eliminar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </td>
                   {/* Columna: Persona */}
                   <td className="px-6 py-5 whitespace-nowrap">
                     <div className="flex items-center gap-4">
@@ -437,7 +365,72 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
                   </td>
 
                   {/* Columna: Acciones */}
-                            
+                  <td className="px-6 py-5 whitespace-nowrap text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {/* Botón Visualizar */}
+                      <button
+                        onClick={() => setViewingItem(p)}
+                        className="
+                          group relative p-2.5
+                          text-[#808080]
+                          hover:text-[#217b83]
+                          bg-white border border-[#c9d1d2]
+                          hover:border-[#217b83]
+                          hover:bg-gradient-to-br hover:from-[#217b83]/5 hover:to-transparent
+                          rounded-xl transition-all duration-300
+                          hover:shadow-md hover:shadow-[#217b83]/20
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-[#217b83]/40
+                          active:scale-95
+                          backdrop-blur-sm
+                        "
+                        title="Visualizar"
+                      >
+                        <Eye className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+                      </button>
+
+                      {/* Botón Editar */}
+                      <button
+                        onClick={() => handleOpenModal(p)}
+                        className="
+                          group relative p-2.5
+                          text-[#808080]
+                          hover:text-[#044ac3]
+                          bg-white border border-[#c9d1d2]
+                          hover:border-[#044ac3]
+                          hover:bg-gradient-to-br hover:from-[#044ac3]/5 hover:to-transparent
+                          rounded-xl transition-all duration-300
+                          hover:shadow-md hover:shadow-[#044ac3]/20
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-[#044ac3]/40
+                          active:scale-95
+                          backdrop-blur-sm
+                        "
+                        title="Editar"
+                      >
+                        <Edit2 className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+                      </button>
+
+                      {/* Botón Eliminar */}
+                      <button
+                        onClick={() => setItemToDelete(p.id)}
+                        className="
+                          group relative p-2.5
+                          text-[#808080]
+                          hover:text-red-600
+                          bg-white border border-[#c9d1d2]
+                          hover:border-red-300
+                          hover:bg-gradient-to-br hover:from-red-50 hover:to-transparent
+                          rounded-xl transition-all duration-300
+                          hover:shadow-md hover:shadow-red-200/40
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40
+                          active:scale-95
+                          backdrop-blur-sm
+                        "
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
