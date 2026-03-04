@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Plus,
   Trash2,
@@ -43,6 +43,7 @@ const TransactionsView: React.FC<Props> = ({
   const [filterType, setFilterType] = useState<TransactionType | "ALL">("ALL");
   const [displayValue, setDisplayValue] = useState("");
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null); // ← AGREGAR
   const [currentPage, setCurrentPage] = useState(1); // ← AGREGAR ESTO
   const itemsPerPage = 5; // ← AGREGAR ESTO
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -57,6 +58,11 @@ const TransactionsView: React.FC<Props> = ({
     attachmentUrl: "",
     attachmentName: "",
   });
+
+  const [toast, setToast] = useState<{
+      type: "success" | "error";
+      message: string;
+    } | null>(null);
 
   const filteredFormCategories = useMemo(() => {
     return categories.filter((c) => c.type === formData.type);
@@ -125,6 +131,31 @@ const TransactionsView: React.FC<Props> = ({
     }
   };
 
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+  };
+
+  useEffect(() => {
+      if (!toast) return;
+      const timer = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(timer);
+    }, [toast]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+          const target = e.target as HTMLElement;
+          // No cerrar si clickeó en el botón o dentro del menú
+          if (!target.closest('[data-menu-button]') && !target.closest('[data-menu-content]')) {
+            setOpenMenuId(null);
+          }
+        };
+        
+        if (openMenuId) {
+          document.addEventListener('click', handleClickOutside);
+        }
+        return () => document.removeEventListener('click', handleClickOutside);
+      }, [openMenuId]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -176,10 +207,12 @@ const TransactionsView: React.FC<Props> = ({
       }
 
       // Limpiar estados
+      showToast("success", "Registro guardado correctamente.");
       setIsModalOpen(false);
       setSelectedFile(null); // ← Limpiar archivo seleccionado
     } catch (error: any) {
       console.error("❌ Error al guardar transacción:", error);
+      showToast("error", "Registro no guardado correctamente.");
       const errorMessage = error.message || "Error desconocido al guardar";
       alert(errorMessage);
     }
@@ -203,7 +236,7 @@ const TransactionsView: React.FC<Props> = ({
         );
         setTransactions(newTransactions);
         setItemToDelete(null);
-
+        showToast("success", "Registro eliminado correctamente.");
         console.log("✅ Transacción eliminada correctamente");
       } catch (error: any) {
         console.error("❌ Error al eliminar transacción:", error);
@@ -298,6 +331,11 @@ const TransactionsView: React.FC<Props> = ({
               <tr>
                 <th className="px-6 py-5 text-left">
                   <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
+                    --
+                  </span>
+                </th>
+                <th className="px-6 py-5 text-left">
+                  <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
                     Fecha / Valor
                   </span>
                 </th>
@@ -311,11 +349,6 @@ const TransactionsView: React.FC<Props> = ({
                     Adjunto
                   </span>
                 </th>
-                <th className="px-6 py-5 text-left">
-                  <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
-                    Acciones
-                  </span>
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -324,6 +357,52 @@ const TransactionsView: React.FC<Props> = ({
                   key={t.id}
                   className="group hover:bg-[#217b83]/5 transition-colors duration-200"
                 >
+                  <td className="px-6 py-5 whitespace-nowrap">
+                    <div className="relative">
+                      <button
+                        data-menu-button onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                        className="
+                          p-2.5 text-slate-800
+                          bg-white border border-[#c9d1d2]
+                          hover:text-slate-800
+                          hover:border-[#217b83] hover:bg-[#217b83]/5
+                          rounded-xl transition-all duration-300
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-[#217b83]/40
+                        "
+                        title="Más opciones"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10.5 1.5H9.5V3.5H10.5V1.5ZM10.5 8.5H9.5V10.5H10.5V8.5ZM10.5 15.5H9.5V17.5H10.5V15.5Z" />
+                        </svg>
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {openMenuId === t.id && (
+                        <div data-menu-content className="absolute left-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[90] animate-in fade-in zoom-in-95 duration-200">
+                          <button
+                            onClick={() => {
+                              handleOpenModal(t);
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-[#044ac3] flex items-center gap-3 border-b border-slate-100 transition-colors font-medium text-sm"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => {
+                              setItemToDelete(t.id);
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 flex items-center gap-3 rounded-b-2xl transition-colors font-medium text-sm"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Eliminar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="text-sm font-bold text-slate-900">
                       {t.date}
@@ -354,7 +433,7 @@ const TransactionsView: React.FC<Props> = ({
                         </span>
                       )}
                       {t.personId && (
-                        <span className="text-[10px] text-slate-400 font-medium">
+                        <span className="text-[15px] text-slate-400 font-medium">
                           • {people.find((p) => p.id === t.personId)?.fullName}
                         </span>
                       )}
@@ -381,25 +460,6 @@ const TransactionsView: React.FC<Props> = ({
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleOpenModal(t)}
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => setItemToDelete(t.id)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -410,11 +470,7 @@ const TransactionsView: React.FC<Props> = ({
       {/* Paginador */}
       <div className="px-6 py-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
         <div className="text-sm text-slate-600 font-medium">
-          Mostrando <span className="font-bold">{startIndex + 1}</span> a{" "}
-          <span className="font-bold">
-            {Math.min(endIndex, filtered.length)}
-          </span>{" "}
-          de <span className="font-bold">{filtered.length}</span> registros
+          Total registros <span className="font-bold">{filtered.length}</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -425,21 +481,6 @@ const TransactionsView: React.FC<Props> = ({
           >
             ← Anterior
           </button>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  currentPage === page
-                    ? "bg-[#00555C] text-white shadow-lg shadow-indigo-100"
-                    : "border border-slate-200 text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-          </div>
           <button
             onClick={() =>
               setCurrentPage((prev) => Math.min(prev + 1, totalPages))
@@ -681,6 +722,8 @@ const TransactionsView: React.FC<Props> = ({
         </div>
       )}
 
+      
+
       {/* Modal de Confirmación de Eliminación */}
       {itemToDelete && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -714,8 +757,61 @@ const TransactionsView: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+       {/* Toast de Notificación */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };
+
+const Toast: React.FC<{
+    type: 'success' | 'error';
+    message: string;
+    onClose: () => void;
+  }> = ({ type, message, onClose }) => (
+    <div
+      className="
+        fixed top-14 left-90 z-[120]
+        animate-in slide-in-from-bottom-20 fade-in duration-150
+      "
+      role="status"
+      aria-live="polite"
+    >
+      <div
+        className={`
+          flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border
+          backdrop-blur-xl transition-all duration-150
+          ${type === 'success'
+            ? 'bg-[#E5EEEE]/90 border-[#217b83]/30 text-[#00454B] shadow-[#00555C]/20'
+            : 'bg-[#E5EEEE]/90 border-[#000000]/30 text-[#00555C] shadow-[#044ac3]/20'}
+        `}
+      >
+        <div
+          className={`
+            w-2.5 h-2.5 rounded-full
+            ${type === 'success' ? 'bg-[#217b83]' : 'bg-[#044ac3]'}
+          `}
+        />
+        <span className="text-sm font-bold tracking-wide">{message}</span>
+        <button
+          onClick={onClose}
+          className="
+            ml-4 text-bg-[#E5EEEE]/90 hover:text-white
+            transition-colors text-lg font-bold
+            hover:rotate-90 duration-150
+          "
+          aria-label="Cerrar notificación"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
 
 export default TransactionsView;

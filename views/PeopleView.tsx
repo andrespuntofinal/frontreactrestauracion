@@ -184,8 +184,9 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
 
         console.log("✅ Persona creada correctamente");
       }
-      setIsModalOpen(false);
       showToast("success", "Registro guardado correctamente.");
+      setIsModalOpen(false);
+      
     } catch (error: any) {
       console.error("❌ Error al guardar persona:", error);
       showToast("error", "Registro no guardado correctamente.");
@@ -448,11 +449,7 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
       {/* Paginador */}
       <div className="px-6 py-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
         <div className="text-sm text-slate-600 font-medium">
-          Mostrando <span className="font-bold">{startIndex + 1}</span> a{" "}
-          <span className="font-bold">
-            {Math.min(endIndex, filtered.length)}
-          </span>{" "}
-          de <span className="font-bold">{filtered.length}</span> registros
+          Total registros <span className="font-bold">{filtered.length}</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -463,21 +460,6 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
           >
             ← Anterior
           </button>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  currentPage === page
-                    ? "bg-[#00555C] text-white shadow-lg shadow-indigo-100"
-                    : "border border-slate-200 text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-          </div>
           <button
             onClick={() =>
               setCurrentPage((prev) => Math.min(prev + 1, totalPages))
@@ -1309,8 +1291,8 @@ const Toast: React.FC<{
 }> = ({ type, message, onClose }) => (
   <div
     className="
-      fixed bottom-6 right-6 z-[120]
-      animate-in slide-in-from-bottom-3 fade-in duration-300
+      fixed top-14 left-90 z-[120]
+      animate-in slide-in-from-bottom-20 fade-in duration-150
     "
     role="status"
     aria-live="polite"
@@ -1318,10 +1300,10 @@ const Toast: React.FC<{
     <div
       className={`
         flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border
-        backdrop-blur-xl transition-all duration-300
+        backdrop-blur-xl transition-all duration-150
         ${type === 'success'
-          ? 'bg-white/90 border-[#217b83]/30 text-[#00555C] shadow-[#217b83]/20'
-          : 'bg-white/90 border-[#044ac3]/30 text-[#044ac3] shadow-[#044ac3]/20'}
+          ? 'bg-[#E5EEEE]/90 border-[#217b83]/30 text-[#00454B] shadow-[#00555C]/20'
+          : 'bg-[#E5EEEE]/90 border-[#000000]/30 text-[#00555C] shadow-[#044ac3]/20'}
       `}
     >
       <div
@@ -1334,9 +1316,9 @@ const Toast: React.FC<{
       <button
         onClick={onClose}
         className="
-          ml-4 text-white/70 hover:text-white
+          ml-4 text-bg-[#E5EEEE]/90 hover:text-white
           transition-colors text-lg font-bold
-          hover:rotate-90 duration-300
+          hover:rotate-90 duration-150
         "
         aria-label="Cerrar notificación"
       >
