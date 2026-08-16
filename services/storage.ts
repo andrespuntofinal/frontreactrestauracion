@@ -3,8 +3,8 @@ import { Ministry, Person, Category, Transaction, User, PermissionModule, SitePa
 import { getAuthHeaders } from './auth';
 import { getAuthToken } from './auth';
 
-//const API_URL = 'https://backnoderestauracion-production.up.railway.app/api';
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'https://backnoderestauracion-production.up.railway.app/api';
+//const API_URL = 'http://localhost:3001/api';
 
 export const storage = {
   // PARÁMETROS DEL SITIO
@@ -86,7 +86,7 @@ export const storage = {
 
       const result = await response.json();
       console.log('✅ Ministerios obtenidos:', result.data);
-      
+
       // Extraer el array 'data' de la respuesta
       return result.data || [];
     } catch (error) {
@@ -98,48 +98,48 @@ export const storage = {
   saveMinistries: async (data: Ministry[]) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('📝 Ministerios recibidos para guardar:', data);
-      
+
       // Filtrar solo los ministerios nuevos (sin ID válido de MongoDB)
       // Los nuevos tienen UUIDs (con guiones), los existentes tienen ObjectIDs (sin guiones)
-      const newMinistries = data.filter(ministry => 
+      const newMinistries = data.filter(ministry =>
         ministry.id.includes('-') // UUID tiene guiones, ObjectID no
       );
-      
+
       console.log('✨ Nuevos ministerios a enviar a API:', newMinistries);
-      
+
       // Enviar solo los nuevos
       for (const ministry of newMinistries) {
         const payload = {
           name: ministry.name,
           status: ministry.status
         };
-        
+
         console.log('📤 Enviando ministerio:', payload);
-        
+
         const response = await fetch(`${API_URL}/ministries`, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
         });
-        
+
         const result = await response.json();
-        
+
         if (!response.ok) {
           // Detectar error de duplicado E11000
           if (result.message?.includes('E11000') || result.message?.includes('duplicate')) {
             console.warn(`⚠️ El ministerio "${ministry.name}" ya existe`);
             throw new Error(`⚠️ El ministerio "${ministry.name}" ya existe en la base de datos`);
           }
-          
+
           console.error('❌ Error del servidor:', result.message);
           throw new Error(result.message || `Error saving ministry: ${response.status}`);
         }
-        
+
         console.log('✅ Ministerio guardado:', result);
       }
-      
+
       console.log('✅ Ministerios nuevos guardados en API');
     } catch (error) {
       console.error('❌ Error saveMinistries:', error);
@@ -150,26 +150,26 @@ export const storage = {
   updateMinistries: async (id: string, data: Partial<Ministry>) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('📝 Actualizando ministerio con ID:', id);
-      
+
       const payload = {
         ...(data.name && { name: data.name }),
         ...(data.status && { status: data.status })
       };
-      
+
       console.log('📤 Enviando datos de actualización:', payload);
-      
+
       const response = await fetch(`${API_URL}/ministries/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error updating ministry: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ Ministerio actualizado:', result);
       return result.data;
@@ -182,18 +182,18 @@ export const storage = {
   deleteMinistries: async (id: string) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('🗑️ Eliminando ministerio con ID:', id);
-      
+
       const response = await fetch(`${API_URL}/ministries/${id}`, {
         method: 'DELETE',
         headers
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error deleting ministry: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ Ministerio eliminado:', result);
       return result;
@@ -205,10 +205,10 @@ export const storage = {
 
   // ARCHIVOS
   // 📤 Subir archivo
-   uploadFile: async (file: File): Promise<{ publicId: string; url: string; fileName: string }> => {
+  uploadFile: async (file: File): Promise<{ publicId: string; url: string; fileName: string }> => {
     try {
       const token = await getAuthToken();
-      
+
       if (!token) {
         throw new Error('❌ Token de autenticación no encontrado');
       }
@@ -227,7 +227,7 @@ export const storage = {
         body: formData
       });
 
-     
+
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -252,60 +252,59 @@ export const storage = {
   },
 
   deleteFile: async (fileId: string): Promise<{ success: boolean }> => {
-  try {
-    const token = await getAuthToken();
+    try {
+      const token = await getAuthToken();
 
-    if (!token) {
-      throw new Error('❌ Token de autenticación no encontrado');
-    }
-
-    console.log('🗑️ Eliminando archivo con ID:', fileId);
-
-    const response = await fetch(`${API_URL}/files/${encodeURIComponent(fileId)}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token}`
+      if (!token) {
+        throw new Error('❌ Token de autenticación no encontrado');
       }
-    });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('❌ Respuesta del servidor:', errorData);
+      console.log('🗑️ Eliminando archivo con ID:', fileId);
 
-      throw new Error(
-        `❌ Error deleting file: ${response.status} - ${
-          errorData.message || 'Sin detalles'
-        }`
-      );
+      const response = await fetch(`${API_URL}/files/${encodeURIComponent(fileId)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Respuesta del servidor:', errorData);
+
+        throw new Error(
+          `❌ Error deleting file: ${response.status} - ${errorData.message || 'Sin detalles'
+          }`
+        );
+      }
+
+      const result = await response.json();
+
+      console.log('✅ Archivo eliminado:', result);
+
+      return {
+        success: result.success ?? true
+      };
+
+    } catch (error) {
+      console.error('❌ Error deleteFile:', error);
+      throw error;
     }
-
-    const result = await response.json();
-
-    console.log('✅ Archivo eliminado:', result);
-
-    return {
-      success: result.success ?? true
-    };
-
-  } catch (error) {
-    console.error('❌ Error deleteFile:', error);
-    throw error;
-  }
-},
+  },
 
   // PERSONAS
   getPeople: async (): Promise<Person[]> => {
     try {
       const headers = await getAuthHeaders();
       const response = await fetch(`${API_URL}/persons`, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`Error fetching people: ${response.status}`);
       }
 
       const result = await response.json();
       console.log('✅ Personas obtenidas:', result.data);
-      
+
       // Extraer el array 'data' de la respuesta
       return result.data || [];
     } catch (error) {
@@ -318,16 +317,16 @@ export const storage = {
   savePeople: async (data: Person[]) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('📝 Personas recibidas para guardar:', data);
-      
+
       // Filtrar solo las personas nuevas (UUIDs con guiones)
-      const newPeople = data.filter(person => 
+      const newPeople = data.filter(person =>
         person.id.includes('-')
       );
-      
+
       console.log('✨ Nuevas personas a enviar a API:', newPeople);
-      
+
       // Enviar solo los nuevos
       for (const person of newPeople) {
         const payload = {
@@ -350,31 +349,31 @@ export const storage = {
           isBaptized: person.isBaptized,
           populationGroup: person.populationGroup
         };
-        
+
         console.log('📤 Enviando persona:', payload);
-        
+
         const response = await fetch(`${API_URL}/persons`, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
         });
-        
+
         const result = await response.json();
-        
+
         if (!response.ok) {
           // Detectar error de duplicado E11000
           if (result.message?.includes('E11000') || result.message?.includes('duplicate')) {
             console.warn(`⚠️ La persona "${person.fullName}" ya existe`);
             throw new Error(`⚠️ La persona "${person.fullName}" ya existe en la base de datos`);
           }
-          
+
           console.error('❌ Error del servidor:', result.message);
           throw new Error(result.message || `Error saving person: ${response.status}`);
         }
-        
+
         console.log('✅ Persona guardada:', result);
       }
-      
+
       console.log('✅ Personas nuevas guardadas en API');
     } catch (error) {
       console.error('❌ Error savePeople:', error);
@@ -385,9 +384,9 @@ export const storage = {
   updatePeople: async (id: string, data: Partial<Person>) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('📝 Actualizando persona con ID:', id);
-      
+
       const payload = {
         ...(data.identification && { identification: data.identification }),
         ...(data.idType && { idType: data.idType }),
@@ -408,22 +407,22 @@ export const storage = {
         ...(data.isBaptized !== undefined && { isBaptized: data.isBaptized }),
         ...(data.populationGroup && { populationGroup: data.populationGroup })
       };
-      
+
       console.log('📤 Enviando datos de actualización:', payload);
-      
+
       const response = await fetch(`${API_URL}/persons/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload)
       });
-      
+
       const result = await response.json();
-      
+
       if (!response.ok) {
         console.error('❌ Error del servidor:', result.message);
         throw new Error(result.message || `Error updating person: ${response.status}`);
       }
-      
+
       console.log('✅ Persona actualizada:', result);
       return result.data;
     } catch (error) {
@@ -435,18 +434,18 @@ export const storage = {
   deletePeople: async (id: string) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('🗑️ Eliminando persona con ID:', id);
-      
+
       const response = await fetch(`${API_URL}/persons/${id}`, {
         method: 'DELETE',
         headers
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error deleting person: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ Persona eliminada:', result);
       return result;
@@ -461,14 +460,14 @@ export const storage = {
     try {
       const headers = await getAuthHeaders();
       const response = await fetch(`${API_URL}/categories`, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`Error fetching categories: ${response.status}`);
       }
 
       const result = await response.json();
       console.log('✅ Categorías obtenidas:', result.data);
-      
+
       // Extraer el array 'data' de la respuesta
       return result.data || [];
     } catch (error) {
@@ -481,16 +480,16 @@ export const storage = {
   saveCategories: async (data: Category[]) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('📝 Categorías recibidas para guardar:', data);
-      
+
       // Filtrar solo las categorías nuevas (UUIDs con guiones)
-      const newCategories = data.filter(category => 
+      const newCategories = data.filter(category =>
         category.id.includes('-')
       );
-      
+
       console.log('✨ Nuevas categorías a enviar a API:', newCategories);
-      
+
       let result;
       // Enviar solo los nuevos
       for (const category of newCategories) {
@@ -498,31 +497,31 @@ export const storage = {
           name: category.name,
           type: category.type
         };
-        
+
         console.log('📤 Enviando categoría:', payload);
-        
+
         const response = await fetch(`${API_URL}/categories`, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
         });
-        
+
         result = await response.json();
-        
+
         if (!response.ok) {
           // Detectar error de duplicado E11000
           if (result.message?.includes('E11000') || result.message?.includes('duplicate')) {
             console.warn(`⚠️ La categoría "${category.name}" ya existe`);
             throw new Error(`⚠️ La categoría "${category.name}" ya existe en la base de datos`);
           }
-          
+
           console.error('❌ Error del servidor:', result.message);
           throw new Error(result.message || `Error saving category: ${response.status}`);
         }
-        
+
         console.log('✅ Categoría guardada:', result);
       }
-      
+
       // Guardar en localStorage como respaldo
       localStorage.setItem('cp_categories', JSON.stringify(data));
       return result;
@@ -536,24 +535,24 @@ export const storage = {
   updateCategories: async (id: string, data: Omit<Category, 'id'>) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       const payload = {
         name: data.name,
         type: data.type
       };
-      
+
       console.log('📝 Actualizando categoría con ID:', id, 'Datos:', payload);
-      
+
       const response = await fetch(`${API_URL}/categories/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error updating category: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ Categoría actualizada:', result);
       return result.data;
@@ -566,18 +565,18 @@ export const storage = {
   deleteCategories: async (id: string) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('🗑️ Eliminando categoría con ID:', id);
-      
+
       const response = await fetch(`${API_URL}/categories/${id}`, {
         method: 'DELETE',
         headers
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error deleting category: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ Categoría eliminada:', result);
       return result;
@@ -592,14 +591,14 @@ export const storage = {
     try {
       const headers = await getAuthHeaders();
       const response = await fetch(`${API_URL}/transactions`, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`Error fetching transactions: ${response.status}`);
       }
 
       const result = await response.json();
       console.log('✅ Transacciones obtenidas:', result.data);
-      
+
       // Extraer el array 'data' de la respuesta
       return result.data || [];
     } catch (error) {
@@ -611,16 +610,16 @@ export const storage = {
   saveTransactions: async (data: Transaction[]) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('📝 Transacciones recibidas para guardar:', data);
-      
+
       // Filtrar solo las transacciones nuevas (UUIDs con guiones)
-      const newTransactions = data.filter(transaction => 
+      const newTransactions = data.filter(transaction =>
         transaction.id.includes('-')
       );
-      
+
       console.log('✨ Nuevas transacciones a enviar a API:', data);
-      
+
       let result;
       // Enviar solo las nuevas
       for (const transaction of newTransactions) {
@@ -638,25 +637,25 @@ export const storage = {
         if (transaction.personId) {
           payload.personId = transaction.personId;
         }
-        
+
         console.log('📤 Enviando transacción nesssss:', payload);
-        
+
         const response = await fetch(`${API_URL}/transactions`, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload)
         });
-        
+
         result = await response.json();
-        
+
         if (!response.ok) {
           console.error('❌ Error del servidor:', result.message);
           throw new Error(result.message || `Error saving transaction: ${response.status}`);
         }
-        
+
         console.log('✅ Transacción guardada:', result);
       }
-      
+
       // Guardar en localStorage como respaldo
       localStorage.setItem('cp_transactions', JSON.stringify(data));
       return result;
@@ -670,7 +669,7 @@ export const storage = {
   updateTransactions: async (id: string, data: Omit<Transaction, 'id'>) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       const payload: any = {
         type: data.type,
         categoryId: data.categoryId,
@@ -685,19 +684,19 @@ export const storage = {
       if (data.personId) {
         payload.personId = data.personId;
       }
-      
+
       console.log('📝 Actualizando transacción con ID:', id, 'Datos:', payload);
-      
+
       const response = await fetch(`${API_URL}/transactions/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error updating transaction: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ Transacción actualizada:', result);
       return result.data;
@@ -710,18 +709,18 @@ export const storage = {
   deleteTransactions: async (id: string) => {
     try {
       const headers = await getAuthHeaders();
-      
+
       console.log('🗑️ Eliminando transacción con ID:', id);
-      
+
       const response = await fetch(`${API_URL}/transactions/${id}`, {
         method: 'DELETE',
         headers
       });
-      
+
       if (!response.ok) {
         throw new Error(`Error deleting transaction: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ Transacción eliminada:', result);
       return result;
@@ -731,7 +730,7 @@ export const storage = {
     }
   },
 
- // USUARIOS
+  // USUARIOS
   getUserByEmail: async (email: string): Promise<User | null> => {
     try {
       const headers = await getAuthHeaders();
@@ -768,7 +767,7 @@ export const storage = {
   },
 
 
-saveUsers: async (data: User[]) => {
+  saveUsers: async (data: User[]) => {
     try {
       const headers = await getAuthHeaders();
 
@@ -802,7 +801,7 @@ saveUsers: async (data: User[]) => {
     }
   },
 
-    updateUsers: async (id: string, data: Partial<User>) => {
+  updateUsers: async (id: string, data: Partial<User>) => {
     try {
       const headers = await getAuthHeaders();
       const payload = {
