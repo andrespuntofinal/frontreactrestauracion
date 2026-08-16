@@ -54,6 +54,7 @@ import { getFinancialInsights } from './services/gemini';
 import { PermissionModule } from './types';
 
 import { AuthError, getAuthToken, setAuthCredentials } from './services/auth';
+import { applyTheme } from './services/theme';
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'PUBLIC' | 'APP'>('PUBLIC');
@@ -78,6 +79,18 @@ const App: React.FC = () => {
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
 
+  // Cargar parámetros del sitio al montar la app (pública o privada)
+  useEffect(() => {
+    storage.getSiteParams().then(params => {
+      if (params) {
+        setSiteParams(params);
+        if (params.theme) {
+          applyTheme(params.theme);
+        }
+      }
+    });
+  }, []);
+
   useEffect(() => {
     const loadData = async () => {
        if (!currentUser || viewMode !== 'APP') return;
@@ -96,6 +109,9 @@ const App: React.FC = () => {
       setTransactions(t);
       setUsers(u);
       setSiteParams(s);
+      if (s?.theme) {
+        applyTheme(s.theme);
+      }
       setIsSyncing(false);
     };
     loadData();
@@ -185,13 +201,15 @@ const handleLogin = async (e: React.FormEvent) => {
           setTransactions={async (t) => { setTransactions(t); await storage.saveTransactions(t); }} 
           categories={categories} 
           people={people} 
+          setPeople={async (p) => { setPeople(p); await storage.savePeople(p); }}
+          ministries={ministries}
         />;
       case PermissionModule.REPORTS:
         return <ReportsView transactions={transactions} people={people} categories={categories} ministries={ministries} />;
       case PermissionModule.ADMIN:
         return <AdminView users={users} setUsers={async (u) => { setUsers(u); await storage.saveUsers(u); }} />;
       case PermissionModule.SITE_PARAMS:
-        return siteParams ? <SiteParamsView params={siteParams} setParams={async (s) => { setSiteParams(s); await storage.saveSiteParams(s); }} /> : null;
+        return siteParams ? <SiteParamsView params={siteParams} setParams={async (s) => { setSiteParams(s); if (s.theme) applyTheme(s.theme); await storage.saveSiteParams(s); }} /> : null;
       case 'ASSISTANT':
         return <AssistantView people={people} ministries={ministries} transactions={transactions} categories={categories} />;
       case 'HOME':
@@ -212,7 +230,7 @@ const handleLogin = async (e: React.FormEvent) => {
       <div className="space-y-6">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3" style={{ color: 'var(--color-secondary)' }}>
               Bienvenido, {currentUser?.name || 'Visitante'}
               {isSyncing && <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin" />}
             </h1>
@@ -229,7 +247,8 @@ const handleLogin = async (e: React.FormEvent) => {
             <button 
               onClick={generateAiInsights}
               disabled={loadingAi}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-100 font-medium"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+              className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl transition-all shadow-md font-medium hover:opacity-90"
             >
               <Sparkles className={`w-4 h-4 ${loadingAi ? 'animate-spin' : ''}`} />
               {loadingAi ? 'Analizando...' : 'Análisis IA'}
@@ -262,7 +281,7 @@ const handleLogin = async (e: React.FormEvent) => {
 
         {aiInsight && (
           <div className="bg-white p-8 rounded-3xl border border-indigo-100 shadow-sm animate-in fade-in slide-in-from-bottom-4">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-indigo-600"><Sparkles className="w-5 h-5" /> Análisis IA</h2>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2" style={{ color: 'var(--color-primary)' }}><Sparkles className="w-5 h-5" /> Análisis IA</h2>
             <div className="text-slate-700 leading-relaxed whitespace-pre-wrap">{aiInsight}</div>
           </div>
         )}
@@ -271,10 +290,13 @@ const handleLogin = async (e: React.FormEvent) => {
   };
 
   const StatCard = ({ title, value, icon, color }: any) => (
-    <div className={`p-6 rounded-3xl border border-slate-200 bg-white flex items-center justify-between shadow-sm`}>
+    <div 
+      className="p-6 rounded-3xl border flex items-center justify-between shadow-sm transition-all"
+      style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+    >
       <div>
         <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-        <p className="text-2xl font-bold text-slate-900">{value}</p>
+        <p className="text-2xl font-bold" style={{ color: 'var(--color-secondary)' }}>{value}</p>
       </div>
       <div className={`p-4 rounded-2xl ${color}`}>{icon}</div>
     </div>
@@ -298,18 +320,8 @@ const handleLogin = async (e: React.FormEvent) => {
         setLoginEmail(normalizedEmail);
         setLoginPassword(password);
         await handleLoginWithCredentials(normalizedEmail, password);
-            } catch (err: any) {
-        const raw =
-          err instanceof AuthError
-            ? err.code
-            : String(err?.message || err?.toString?.() || '');
-        const code = raw.toUpperCase();
-
-        if (code.includes('INVALID_LOGIN_CREDENTIALS')) {
-          setError('Credenciales inválidas. Verifica tu correo y contraseña.');
-        } else {
-          setError(err?.message || 'Error al iniciar sesión.');
-        }
+      } catch (err: any) {
+        setError(err.message || 'Error al iniciar sesión');
       } finally {
         setLoading(false);
       }
@@ -336,21 +348,19 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-100/50 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-violet-100/50 rounded-full blur-3xl animate-pulse" />
 
-        <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-10 border border-slate-100 relative z-10 animate-in zoom-in-95 duration-300">
- 
-
-          <div className="w-30 h-30 bg-white rounded-[2rem] flex items-center justify-center">
-          <img
-            src="https://res.cloudinary.com/dxe4xocus/image/upload/v1772144228/attachments/s4yboasj5cvez3t90vfm.png"
-            alt="Church"
-            className="w-42 h-32 object-cover rounded-[1.5rem] shadow-lg shadow-[#00555C]/50"
-          />
-          
-        </div>     
-                   <div className="text-center mb-10 mt-6">
-            
+        <div 
+          className="max-w-md w-full rounded-[2.5rem] shadow-2xl p-10 border relative z-10 animate-in zoom-in-95 duration-300"
+          style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+        >
+          <div className="w-30 h-30 bg-white rounded-[2rem] flex items-center justify-center mx-auto mb-4">
+            <img
+              src="https://res.cloudinary.com/dxe4xocus/image/upload/v1772144228/attachments/s4yboasj5cvez3t90vfm.png"
+              alt="Church"
+              className="w-42 h-32 object-cover rounded-[1.5rem] shadow-lg shadow-black/10"
+            />
+          </div>     
+          <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-slate-400">PANEL DE CONTROL</h1>
-           
           </div>
                      
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -361,79 +371,61 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
               </div>
             )}
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Correo Electrónico</label>
-              <div className="relative group">
-                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Correo Electrónico</label>
+              <div className="relative">
+                <Mail className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input 
-                  required
                   type="email" 
-                  placeholder="ejemplo@comunidad.pro"
-                  autoComplete="username"
-                  className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-400 transition-all font-medium text-slate-900"
+                  required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="admin@comunidad.pro"
+                  className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100 text-sm"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Contraseña</label>
-              <div className="relative group">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Contraseña</label>
+              <div className="relative">
+                <Lock className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input 
+                  type={showPassword ? 'text' : 'password'} 
                   required
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  className="w-full pl-14 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-400 transition-all font-medium text-slate-900"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100 text-sm"
                 />
                 <button 
-                  type="button"
+                  type="button" 
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between px-1">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input type="checkbox" className="w-4 h-4 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                <span className="text-sm font-medium text-slate-500 group-hover:text-slate-700">Recordarme</span>
-              </label>
-              <button type="button" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">¿Olvidaste tu clave?</button>
-            </div>
-
             <button 
-              type="submit" 
+              type="submit"
               disabled={loading}
-              className="w-full bg-[#217b83] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-[#00555C]/30 hover:bg-[#00454b] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:translate-y-0"
-
+              style={{ backgroundColor: 'var(--color-primary)' }}
+              className="w-full py-4 text-white font-bold rounded-2xl transition-all shadow-xl hover:opacity-90 flex items-center justify-center gap-2 mt-4"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  Iniciando sesión...
-                </>
-              ) : (
-                <>
-                  Ingresar
-                  <ChevronRight className="w-6 h-6" />
-                </>
-              )}
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ingresar al Sistema'}
             </button>
           </form>
 
-         <button 
-            onClick={() => setViewMode('PUBLIC')} 
-            className="mb-8 text-slate-400 hover:text-indigo-600 flex items-center gap-2 mx-auto font-bold text-sm transition-colors mt-6"
-          >
-            &larr; Volver al sitio público
-          </button>
+          <div className="mt-8 text-center border-t border-slate-100 pt-6">
+            <button 
+              onClick={() => setViewMode('PUBLIC')}
+              className="text-slate-500 hover:text-slate-700 text-xs font-bold flex items-center justify-center gap-1 mx-auto"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" /> Volver al sitio público
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -457,16 +449,15 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
         ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'}
         ${!isSidebarOpen && (isSidebarCollapsed ? 'md:w-20' : 'md:w-64')}
       `}>
-        <div className="h-full flex flex-col p-4 bg-[#c9d1d2]">
+        <div className="h-full flex flex-col p-4 transition-colors" style={{ backgroundColor: 'var(--color-sidebar-bg)' }}>
           <div className={`flex items-center gap-3 mb-8 px-2 ${isSidebarCollapsed && !isSidebarOpen ? 'justify-center' : ''}`}>
-                     <div className="w-30 h-30 bg-white rounded-[2rem] flex items-center justify-center">
-          <img
-            src="https://res.cloudinary.com/dxe4xocus/image/upload/v1772144228/attachments/s4yboasj5cvez3t90vfm.png"
-            alt="Church"
-            className="w-42 h-32 object-cover rounded-[1.5rem] shadow-xl shadow-[#00555C]/30 hover:shadow-2xl hover:shadow-[#00555C]/50 transition-all duration-300"
-          />
-          
-        </div>  
+            <div className="w-30 h-30 bg-white rounded-[2rem] flex items-center justify-center">
+              <img
+                src="https://res.cloudinary.com/dxe4xocus/image/upload/v1772144228/attachments/s4yboasj5cvez3t90vfm.png"
+                alt="Church"
+                className="w-42 h-32 object-cover rounded-[1.5rem] shadow-xl hover:shadow-2xl transition-all duration-300"
+              />
+            </div>  
             {(!isSidebarCollapsed || isSidebarOpen) && <span className="text-xl font-black text-slate-900 truncate"></span>}
           </div>
 
@@ -512,14 +503,14 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
             ))}
           </nav>
 
-          <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
+          <div className="mt-auto pt-4 border-t border-black/10 space-y-2">
             <button 
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-              className={`hidden md:flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-bold text-xs ${isSidebarCollapsed ? 'justify-center' : ''}`}
+              className={`hidden md:flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-black/5 transition-all font-bold text-xs ${isSidebarCollapsed ? 'justify-center' : ''}`}
             >
               {isSidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <><PanelLeftClose className="w-5 h-5" /> Colapsar</>}
             </button>
-            <button onClick={handleLogout} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all font-bold text-xs ${isSidebarCollapsed && !isSidebarOpen ? 'justify-center' : ''}`}>
+            <button onClick={handleLogout} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all font-bold text-xs ${isSidebarCollapsed && !isSidebarOpen ? 'justify-center' : ''}`}>
               <LogOut className="w-5 h-5" /> {(!isSidebarCollapsed || isSidebarOpen) && 'Cerrar Sesión'}
             </button>
           </div>
@@ -540,9 +531,9 @@ const handleLoginWithCredentials = async (email: string, password: string) => {
           <div className="flex items-center gap-3">
              <div className="hidden sm:flex flex-col items-end">
                <span className="text-xs font-black text-slate-900">{currentUser.name}</span>
-               <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tighter">{currentUser.role}</span>
+               <span className="text-[10px] font-bold uppercase tracking-tighter" style={{ color: 'var(--color-primary)' }}>{currentUser.role}</span>
              </div>
-             <img src={currentUser.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-xl object-cover ring-2 ring-indigo-50" alt="" />
+             <img src={currentUser.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-xl object-cover ring-2 ring-slate-100" alt="" />
           </div>
         </header>
 
@@ -558,12 +549,16 @@ const NavItem = ({ icon, label, active, onClick, collapsed }: any) => (
   <button 
     onClick={onClick} 
     title={collapsed ? label : ''}
+    style={{
+      backgroundColor: active ? 'var(--color-active-nav-bg)' : undefined,
+      color: active ? 'var(--color-active-nav-text)' : undefined
+    }}
     className={`
     w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all font-bold text-sm
-    focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00555C]
+    focus:outline-none focus-visible:ring-2
     ${active 
-    ? 'bg-[#00555C] text-white shadow-lg shadow-[#00555C]/30' 
-    : 'text-slate-500 hover:bg-[#00555C]/10 hover:text-[#00555C]'
+    ? 'shadow-lg shadow-black/10' 
+    : 'nav-item-theme'
     }
   ${collapsed ? 'justify-center' : ''}
 `}

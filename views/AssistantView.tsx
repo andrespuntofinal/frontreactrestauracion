@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User as UserIcon, Loader2, Sparkles, MessageSquare } from 'lucide-react';
 import { askCommunityAssistant } from '../services/gemini';
@@ -81,20 +80,23 @@ const AssistantView: React.FC<Props> = ({ people, ministries, transactions, cate
   ];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] max-w-4xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+    <div 
+      className="flex flex-col h-[calc(100vh-12rem)] max-w-4xl mx-auto rounded-3xl border shadow-sm overflow-hidden transition-all animate-in fade-in duration-300"
+      style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+    >
       {/* Header */}
       <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-600 rounded-xl">
-            <Sparkles className="text-white w-5 h-5" />
+          <div className="p-2 rounded-xl text-white shadow-sm" style={{ backgroundColor: 'var(--color-primary)' }}>
+            <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Asistente de Comunidad</h2>
-            <p className="text-xs text-slate-500 font-medium uppercase tracking-tight">Potenciado por IA Gemini</p>
+            <h2 className="text-lg font-bold text-slate-900">Asistente Inteligente</h2>
+            <p className="text-xs text-slate-500 font-medium uppercase tracking-tight">Consultas analíticas impulsadas por IA</p>
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-bold">
-          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold">
+          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
           SISTEMA ONLINE
         </div>
       </div>
@@ -103,17 +105,28 @@ const AssistantView: React.FC<Props> = ({ people, ministries, transactions, cate
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-              msg.role === 'assistant' ? 'bg-indigo-600' : 'bg-slate-100'
-            }`}>
-              {msg.role === 'assistant' ? <Bot className="text-white w-5 h-5" /> : <UserIcon className="text-slate-500 w-5 h-5" />}
+            <div 
+              style={{
+                backgroundColor: msg.role === 'assistant' ? 'var(--color-primary)' : undefined
+              }}
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 text-white ${
+                msg.role === 'user' ? 'bg-slate-800' : ''
+              }`}
+            >
+              {msg.role === 'assistant' ? <Bot className="w-5 h-5" /> : <UserIcon className="w-5 h-5" />}
             </div>
             <div className={`max-w-[80%] space-y-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
-              <div className={`p-4 rounded-3xl inline-block text-sm leading-relaxed ${
-                msg.role === 'assistant' 
-                ? 'bg-slate-50 text-slate-800 rounded-tl-none border border-slate-100' 
-                : 'bg-indigo-600 text-white rounded-tr-none shadow-md shadow-indigo-100'
-              }`}>
+              <div 
+                style={{
+                  backgroundColor: msg.role === 'user' ? 'var(--color-primary)' : undefined,
+                  color: msg.role === 'user' ? '#ffffff' : undefined
+                }}
+                className={`p-4 rounded-3xl inline-block text-sm leading-relaxed ${
+                  msg.role === 'assistant' 
+                  ? 'bg-slate-50 text-slate-800 rounded-tl-none border border-slate-100' 
+                  : 'rounded-tr-none shadow-md'
+                }`}
+              >
                 {msg.text}
               </div>
               <p className="text-[10px] text-slate-400 font-medium px-2">
@@ -125,10 +138,10 @@ const AssistantView: React.FC<Props> = ({ people, ministries, transactions, cate
         {isLoading && (
           <div className="flex gap-4 animate-pulse">
             <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center">
-              <Loader2 className="text-indigo-400 w-5 h-5 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--color-primary)' }} />
             </div>
             <div className="bg-slate-50 p-4 rounded-3xl rounded-tl-none border border-slate-100 text-sm text-slate-400">
-              Analizando base de datos...
+              Analizando registros de la comunidad...
             </div>
           </div>
         )}
@@ -138,12 +151,12 @@ const AssistantView: React.FC<Props> = ({ people, ministries, transactions, cate
       {/* Input Area */}
       <div className="p-6 bg-white border-t border-slate-100">
         {messages.length === 1 && (
-          <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex flex-wrap gap-2 mb-4">
             {suggestions.map(s => (
               <button 
                 key={s}
                 onClick={() => setInput(s)}
-                className="text-xs font-bold bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-4 py-2 rounded-xl border border-slate-100 transition-all"
+                className="text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-700 px-4 py-2 rounded-2xl border border-slate-200 transition-all hover:scale-105"
               >
                 {s}
               </button>
@@ -154,20 +167,21 @@ const AssistantView: React.FC<Props> = ({ people, ministries, transactions, cate
           <input 
             type="text" 
             placeholder="Pregunta algo sobre tu comunidad..."
-            className="w-full pl-6 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all font-medium text-slate-800"
+            className="w-full pl-6 pr-14 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-medium text-slate-800 text-sm"
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
           <button 
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 text-white rounded-xl hover:opacity-90 disabled:opacity-40 transition-all shadow-md"
           >
             <Send className="w-5 h-5" />
           </button>
         </form>
-        <p className="text-center mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          Los datos son procesados de forma privada para fines administrativos
+        <p className="text-center mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          Consultas analíticas procesadas privadamente para gestión interna
         </p>
       </div>
     </div>

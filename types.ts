@@ -76,6 +76,26 @@ export interface SiteEvent {
   imageUrl: string;
 }
 
+export interface SiteTheme {
+  primaryColor: string;
+  primaryHover: string;
+  secondaryColor: string;
+  accentColor: string;
+  cardBg: string;
+  cardBorder: string;
+  tableHeaderBg: string;
+  tableHeaderText: string;
+  sidebarBg: string;
+  activeNavBg: string;
+  activeNavText: string;
+  sidebarHoverBg: string;
+  sidebarTextColor: string;
+  formHeaderBg: string;
+  formLabelColor: string;
+  formInputText: string;
+  formTitleColor: string;
+}
+
 export interface SiteParameters {
   heroImages: string[];
   aboutUs: string;
@@ -90,6 +110,7 @@ export interface SiteParameters {
     instagram: string;
     youtube: string;
   };
+  theme?: SiteTheme;
 }
 
 export interface Ministry {

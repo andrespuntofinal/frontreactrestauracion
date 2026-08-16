@@ -3,12 +3,25 @@ import { Ministry, Person, Category, Transaction, User, PermissionModule, SitePa
 import { getAuthHeaders } from './auth';
 import { getAuthToken } from './auth';
 
-const API_URL = 'https://backnoderestauracion-production.up.railway.app/api';
-//const API_URL = 'http://localhost:3001/api';
+//const API_URL = 'https://backnoderestauracion-production.up.railway.app/api';
+const API_URL = 'http://localhost:3001/api';
 
 export const storage = {
   // PARÁMETROS DEL SITIO
   getSiteParams: async (): Promise<SiteParameters> => {
+    try {
+      const response = await fetch(`${API_URL}/site-params`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data) {
+          localStorage.setItem('cp_site_params', JSON.stringify(result.data));
+          return result.data;
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Error obteniendo site-params de la API, usando fallback:', error);
+    }
+
     const data = localStorage.getItem('cp_site_params');
     return data ? JSON.parse(data) : {
       heroImages: [
@@ -28,10 +41,36 @@ export const storage = {
         facebook: 'https://facebook.com',
         instagram: 'https://instagram.com',
         youtube: 'https://youtube.com'
+      },
+      theme: {
+        primaryColor: '#00555C',
+        primaryHover: '#004247',
+        secondaryColor: '#0f172a',
+        accentColor: '#06b6d4',
+        cardBg: '#ffffff',
+        cardBorder: '#e2e8f0',
+        tableHeaderBg: '#f8fafc',
+        tableHeaderText: '#475569',
+        sidebarBg: '#c9d1d2',
+        activeNavBg: '#00555C',
+        activeNavText: '#ffffff'
       }
     };
   },
   saveSiteParams: async (data: SiteParameters) => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/site-params`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) {
+        console.warn(`⚠️ Error guardando site params en API: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Error saveSiteParams:', error);
+    }
     localStorage.setItem('cp_site_params', JSON.stringify(data));
   },
 

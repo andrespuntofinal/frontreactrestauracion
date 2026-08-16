@@ -39,7 +39,7 @@ const LandingView: React.FC<Props> = ({ params, onAdminAccess }) => {
       {/* Header */}
       <nav className="fixed top-0 inset-x-0 z-[60] bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg" style={{ backgroundColor: 'var(--color-primary)' }}>
             <Church className="w-6 h-6 text-white" />
           </div>
           <span className="text-xl font-bold tracking-tight text-slate-900">Restauración y Poder</span>
@@ -73,7 +73,10 @@ const LandingView: React.FC<Props> = ({ params, onAdminAccess }) => {
             Un espacio donde cada persona cuenta y cada servicio transforma vidas.
           </p>
           <div className="mt-10 animate-in fade-in slide-in-from-bottom-10 duration-700 delay-300">
-            <button className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-lg hover:bg-indigo-500 transition-all shadow-2xl shadow-indigo-500/30">
+            <button 
+              style={{ backgroundColor: 'var(--color-primary)' }}
+              className="text-white px-10 py-4 rounded-2xl font-black text-lg hover:opacity-90 transition-all shadow-2xl"
+            >
               Conócenos más
             </button>
           </div>
@@ -85,7 +88,8 @@ const LandingView: React.FC<Props> = ({ params, onAdminAccess }) => {
             <button 
               key={i}
               onClick={() => setCurrentSlide(i)}
-              className={`h-2.5 rounded-full transition-all ${currentSlide === i ? 'w-10 bg-indigo-500' : 'w-2.5 bg-white/40'}`}
+              style={{ backgroundColor: currentSlide === i ? 'var(--color-primary)' : undefined }}
+              className={`h-2.5 rounded-full transition-all ${currentSlide === i ? 'w-10' : 'w-2.5 bg-white/40'}`}
             />
           ))}
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Plus,
   Edit2,
@@ -24,6 +24,10 @@ import {
   PartyPopper,
   Briefcase as OccupationIcon,
   Check,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Filter
 } from "lucide-react";
 import {
   Person,
@@ -45,16 +49,24 @@ interface Props {
   ministries: Ministry[];
 }
 
+type SortField = 'fullName' | 'identification' | 'ministry' | 'address';
+
 const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [ministryFilter, setMinistryFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [sortField, setSortField] = useState<SortField>('fullName');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Person | null>(null);
   const [viewingItem, setViewingItem] = useState<Person | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null); // ← AGREGAR
-  const [currentPage, setCurrentPage] = useState(1); // ← AGREGAR ESTO
-  const itemsPerPage = 5; // ← AGREGAR ESTO
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
   const activeMinistries = ministries.filter(
     (m) => m.status === MinistryStatus.ACTIVE,
   );
@@ -139,12 +151,11 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      // No cerrar si clickeó en el botón o dentro del menú
       if (!target.closest('[data-menu-button]') && !target.closest('[data-menu-content]')) {
         setOpenMenuId(null);
       }
     };
-    
+
     if (openMenuId) {
       document.addEventListener('click', handleClickOutside);
     }
@@ -156,369 +167,356 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
 
     try {
       if (editingItem) {
-        // Actualizar persona existente
-        console.log("📝 Actualizando persona:", editingItem.id);
         await storage.updatePeople(editingItem.id, formData);
-
-        // Actualizar estado local
         setPeople(
           people.map((p) =>
             p.id === editingItem.id ? { ...p, ...formData } : p,
           ),
         );
-        console.log("✅ Persona actualizada correctamente");
       } else {
-        // Crear nueva persona
-        console.log("➕ Creando nueva persona");
         const newPerson: Person = {
           id: crypto.randomUUID(),
           ...formData,
         };
-
-        // Intentar guardar en la API
         await storage.savePeople([...people, newPerson]);
-
-        // Si es exitoso, refrescar la lista desde la API
         const updatedPeople = await storage.getPeople();
         setPeople(updatedPeople);
-
-        console.log("✅ Persona creada correctamente");
       }
       showToast("success", "Registro guardado correctamente.");
       setIsModalOpen(false);
-      
     } catch (error: any) {
       console.error("❌ Error al guardar persona:", error);
       showToast("error", "Registro no guardado correctamente.");
-      const errorMessage = error.message || "Error desconocido al guardar";
-      alert(errorMessage);
+      alert(error.message || "Error al guardar la persona");
     }
   };
 
   const confirmDelete = async () => {
     if (itemToDelete) {
       try {
-        console.log("🗑️ Eliminando persona:", itemToDelete);
-        await storage.deletePeople(itemToDelete);
-
-        // Actualizar estado local
-        const newPeople = people.filter((p) => p.id !== itemToDelete);
-        setPeople(newPeople);
+        await storage.deletePerson(itemToDelete);
+        setPeople(people.filter((p) => p.id !== itemToDelete));
         setItemToDelete(null);
-        showToast("success", "Registro eliminado correctamente.");
-        console.log("✅ Persona eliminada correctamente");
+        showToast("success", "Persona eliminada correctamente.");
       } catch (error: any) {
         console.error("❌ Error al eliminar persona:", error);
-        const errorMessage = error.message || "Error desconocido al eliminar";
-        alert(errorMessage);
+        alert(error.message || "Error al eliminar");
       }
     }
   };
 
-  const filtered = people.filter(
-    (p) =>
-      p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.identification.includes(searchTerm),
-  );
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const filteredAndSorted = useMemo(() => {
+    return people
+      .filter((p) => {
+        const matchesSearch =
+          p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.identification.includes(searchTerm) ||
+          p.phone.includes(searchTerm);
+
+        const matchesMinistry = ministryFilter === "ALL" || p.ministryId === ministryFilter;
+        const matchesStatus = statusFilter === "ALL" || p.status === statusFilter;
+
+        return matchesSearch && matchesMinistry && matchesStatus;
+      })
+      .sort((a, b) => {
+        let valA = "";
+        let valB = "";
+
+        if (sortField === 'fullName') {
+          valA = a.fullName.toLowerCase();
+          valB = b.fullName.toLowerCase();
+        } else if (sortField === 'identification') {
+          valA = a.identification;
+          valB = b.identification;
+        } else if (sortField === 'ministry') {
+          valA = ministries.find(m => m.id === a.ministryId)?.name || "";
+          valB = ministries.find(m => m.id === b.ministryId)?.name || "";
+        } else if (sortField === 'address') {
+          valA = a.address.toLowerCase();
+          valB = b.address.toLowerCase();
+        }
+
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+  }, [people, searchTerm, ministryFilter, statusFilter, sortField, sortDirection, ministries]);
+
+  const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedData = filtered.slice(startIndex, endIndex);
+  const paginatedData = filteredAndSorted.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleSearch = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3.5 h-3.5 opacity-40 hover:opacity-100" />;
+    return sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-current" /> : <ArrowDown className="w-3.5 h-3.5 text-current" />;
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Personas</h1>
-          <p className="text-slate-500">
-            Administra los miembros de la comunidad.
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Personas</h1>
+          <p className="text-slate-500 text-sm">
+            Gestión y expedientes de miembros de la comunidad ({filteredAndSorted.length} registros).
           </p>
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="
-    bg-[#00555C] text-white
-    px-6 py-3
-    rounded-2xl
-    font-semibold tracking-wide
-    flex items-center gap-2
-    shadow-lg shadow-[#00555C]/30
-    hover:bg-[#00454b]
-    hover:shadow-xl hover:shadow-[#00555C]/40
-    hover:-translate-y-[1px]
-    active:scale-[0.97]
-    transition-all duration-300 ease-out
-    focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00555C]/50
-  "
+          style={{ backgroundColor: 'var(--color-primary)' }}
+          className="text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg hover:opacity-90 transition-all hover:-translate-y-0.5 active:scale-[0.98]"
         >
           <Plus className="w-5 h-5" />
           Agregar Persona
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-[#00555C]/10">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre o identificación..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all"
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
+      {/* Filter and Search Bar */}
+      <div className="p-4 rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-md shadow-sm space-y-3 md:space-y-0 md:flex md:items-center md:gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, identificación o teléfono..."
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={ministryFilter}
+              onChange={(e) => { setMinistryFilter(e.target.value); setCurrentPage(1); }}
+              className="bg-transparent text-xs font-bold text-slate-700 outline-none"
+            >
+              <option value="ALL">Todos los Ministerios</option>
+              {ministries.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-200">
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              className="bg-transparent text-xs font-bold text-slate-700 outline-none"
+            >
+              <option value="ALL">Todos los Estados</option>
+              <option value={PersonStatus.ACTIVE}>Activos</option>
+              <option value={PersonStatus.INACTIVE}>Inactivos</option>
+            </select>
           </div>
         </div>
+      </div>
+
+      {/* Main Table Card */}
+      <div
+        className="rounded-3xl border shadow-sm overflow-hidden transition-all"
+        style={{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-card-border)' }}
+      >
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-[#00555C]/10 via-[#217b83]/5 to-[#044ac3]/5">
+          <table className="w-full text-left">
+            <thead style={{ backgroundColor: 'var(--color-table-header-bg)', color: 'var(--color-table-header-text)' }}>
               <tr>
-                <th className="px-6 py-5 text-left">
-                  <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
-                    --
-                  </span>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider w-16">Acción</th>
+                <th
+                  onClick={() => handleSort('fullName')}
+                  className="px-6 py-4 text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-black/5 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Persona {renderSortIcon('fullName')}
+                  </div>
                 </th>
-                <th className="px-6 py-5 text-left">
-                  <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
-                    Persona
-                  </span>
+                <th
+                  onClick={() => handleSort('ministry')}
+                  className="px-6 py-4 text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-black/5 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Ministerio {renderSortIcon('ministry')}
+                  </div>
                 </th>
-                <th className="px-6 py-5 text-left">
-                  <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
-                    Ministerio
-                  </span>
-                </th>
-                <th className="px-6 py-5 text-left">
-                  <span className="text-xs font-black text-[#00555C] uppercase tracking-widest">
-                    Dirección
-                  </span>
+                <th
+                  onClick={() => handleSort('address')}
+                  className="px-6 py-4 text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-black/5 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    Ubicación {renderSortIcon('address')}
+                  </div>
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paginatedData.map((p, idx) => (
-                <tr
-                  key={p.id}
-                  className="group hover:bg-[#217b83]/5 transition-colors duration-200"
-                >
-                  <td className="px-6 py-5 whitespace-nowrap">
-                    <div className="relative">
-                      <button
-                        data-menu-button onClick={() => setOpenMenuId(openMenuId === p.id ? null : p.id)}
-                        className="
-                          p-2.5 text-slate-800
-                          bg-white border border-[#c9d1d2]
-                          hover:text-slate-800
-                          hover:border-[#217b83] hover:bg-[#217b83]/5
-                          rounded-xl transition-all duration-300
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-[#217b83]/40
-                        "
-                        title="Más opciones"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10.5 1.5H9.5V3.5H10.5V1.5ZM10.5 8.5H9.5V10.5H10.5V8.5ZM10.5 15.5H9.5V17.5H10.5V15.5Z" />
-                        </svg>
-                      </button>
-
-                      {/* Dropdown Menu */}
-                      {openMenuId === p.id && (
-                        <div data-menu-content className="absolute left-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[90] animate-in fade-in zoom-in-95 duration-200">
-                          <button
-                            onClick={() => {
-                              setViewingItem(p);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-[#217b83] flex items-center gap-3 border-b border-slate-100 rounded-t-2xl first:rounded-t-2xl transition-colors font-medium text-sm"
-                          >
-                            <Eye className="w-4 h-4" />
-                            Visualizar
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleOpenModal(p);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-[#044ac3] flex items-center gap-3 border-b border-slate-100 transition-colors font-medium text-sm"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => {
-                              setItemToDelete(p.id);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 flex items-center gap-3 rounded-b-2xl transition-colors font-medium text-sm"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Eliminar
-                          </button>
-                        </div>
-                      )}
-                    </div>
+              {paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-slate-400 font-medium text-sm">
+                    No se encontraron personas registradas con los filtros seleccionados.
                   </td>
-                  {/* Columna: Persona */}
-                  <td className="px-6 py-5 whitespace-nowrap">
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <img
-                          src={
-                            p.photoUrl ||
-                            `https://picsum.photos/seed/${p.id}/300`
-                          }
-                          className="
-                            w-12 h-12 rounded-xl object-cover
-                            ring-2 ring-[#c9d1d2]
-                            group-hover:ring-[#217b83]
-                            transition-all duration-300
-                            cursor-pointer hover:scale-110
-                          "
-                          alt={p.fullName}
-                          onClick={() =>
-                            setSelectedPhoto(
-                              p.photoUrl ||
-                                `https://picsum.photos/seed/${p.id}/300`,
-                            )
-                          }
-                        />
-                        <div
-                          className={`
-                          absolute -bottom-1 -right-1 w-4 h-4 rounded-full ring-2 ring-white
-                          transition-colors duration-300
-                          ${p.status === PersonStatus.ACTIVE ? "bg-green-500" : "bg-red-500"}
-                        `}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">
-                          {p.fullName}
-                        </p>
-                        <p className="text-xs text-[#808080] font-semibold">
-                          {p.idType} • {p.identification}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Columna: Ministerio */}
-                  <td className="px-6 py-5 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <Church className="w-4 h-4 text-[#217b83] flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">
-                          {ministries.find((m) => m.id === p.ministryId)
-                            ?.name || "Sin ministerio"}
-                        </p>
-                        <p className="text-xs text-[#808080]">
-                          {p.membershipType}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Columna: Dirección */}
-                  <td className="px-6 py-5">
-                    <div className="flex items-start gap-2 max-w-xs">
-                      <MapPin className="w-4 h-4 text-[#044ac3] flex-shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">
-                          {p.address || "—"}
-                        </p>
-                        <p className="text-xs text-[#808080] truncate">
-                          {p.neighborhood || "No registrado"}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Columna: Acciones */}
-                            
                 </tr>
-              ))}
+              ) : (
+                paginatedData.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="relative">
+                        <button
+                          data-menu-button
+                          onClick={() => setOpenMenuId(openMenuId === p.id ? null : p.id)}
+                          className="p-2 text-slate-500 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                          title="Opciones"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10.5 1.5H9.5V3.5H10.5V1.5ZM10.5 8.5H9.5V10.5H10.5V8.5ZM10.5 15.5H9.5V17.5H10.5V15.5Z" />
+                          </svg>
+                        </button>
+
+                        {/* Context Menu */}
+                        {openMenuId === p.id && (
+                          <div data-menu-content className="absolute left-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[90] animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+                            <button
+                              onClick={() => { setViewingItem(p); setOpenMenuId(null); }}
+                              className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-100 text-xs font-bold"
+                            >
+                              <Eye className="w-4 h-4 text-indigo-600" />
+                              Visualizar Expediente
+                            </button>
+                            <button
+                              onClick={() => { handleOpenModal(p); setOpenMenuId(null); }}
+                              className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-100 text-xs font-bold"
+                            >
+                              <Edit2 className="w-4 h-4 text-blue-600" />
+                              Editar Datos
+                            </button>
+                            <button
+                              onClick={() => { setItemToDelete(p.id); setOpenMenuId(null); }}
+                              className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 flex items-center gap-3 text-xs font-bold"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Eliminar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Persona */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                          <img
+                            src={p.photoUrl || `https://picsum.photos/seed/${p.id}/300`}
+                            className="w-12 h-12 rounded-2xl object-cover ring-2 ring-slate-100 shadow-sm cursor-pointer hover:scale-105 transition-transform"
+                            alt={p.fullName}
+                            onClick={() => setSelectedPhoto(p.photoUrl || `https://picsum.photos/seed/${p.id}/300`)}
+                          />
+                          <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ring-2 ring-white ${p.status === PersonStatus.ACTIVE ? "bg-emerald-500" : "bg-red-500"}`} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900 leading-tight">{p.fullName}</p>
+                          <p className="text-xs text-slate-500 font-mono mt-0.5">{p.idType} • {p.identification}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Ministerio */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 bg-indigo-50 rounded-xl">
+                          <Church className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">
+                            {ministries.find((m) => m.id === p.ministryId)?.name || "Sin ministerio"}
+                          </p>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            {p.membershipType}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Ubicación */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-800 truncate max-w-xs">{p.address || "No registrada"}</p>
+                          <p className="text-xs text-slate-400">{p.neighborhood || "Sin barrio"}</p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500">
+              Página {currentPage} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Paginador */}
-      <div className="px-6 py-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-        <div className="text-sm text-slate-600 font-medium">
-          Total registros <span className="font-bold">{filtered.length}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium text-slate-600"
-          >
-            ← Anterior
-          </button>
-          <button
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-            }
-            disabled={currentPage === totalPages}
-            className="px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium text-slate-600"
-          >
-            Siguiente →
-          </button>
-        </div>
-      </div>
-
-      {/* Lightbox para ampliar imagen */}
+      {/* Modal Foto de Perfil Ampliada */}
       {selectedPhoto && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md animate-in fade-in duration-300"
-          onClick={() => setSelectedPhoto(null)}
-        >
-          <div className="relative max-w-3xl w-full flex items-center justify-center">
-            <button className="absolute -top-12 right-0 text-white hover:text-slate-300 transition-colors">
-              <X className="w-8 h-8" />
+        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setSelectedPhoto(null)}>
+          <div className="relative max-w-lg w-full bg-white rounded-3xl overflow-hidden shadow-2xl p-2" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedPhoto(null)} className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full hover:bg-black/70">
+              <X className="w-5 h-5" />
             </button>
-            <img
-              src={selectedPhoto}
-              className="max-w-full max-h-[85vh] rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300 ring-8 ring-white/10"
-              alt="Ampliada"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <img src={selectedPhoto} className="w-full h-auto rounded-2xl object-cover" alt="Foto ampliada" />
           </div>
         </div>
       )}
 
-      {/* Modal de Confirmación de Eliminación */}
+      {/* Modal Eliminar Persona */}
       {itemToDelete && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 animate-in zoom-in-95 duration-300">
-            <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-6">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
+        <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
             </div>
-
-            <h3 className="text-xl font-bold text-slate-900 text-center mb-3">
-              Eliminar Persona
-            </h3>
-            <p className="text-slate-600 text-center mb-8">
-              ¿Estás seguro de que deseas eliminar esta persona? Esta acción no
-              se puede deshacer.
+            <h3 className="text-xl font-bold text-slate-900 text-center">Eliminar Persona</h3>
+            <p className="text-sm text-slate-500 text-center">
+              ¿Estás seguro de eliminar esta persona? Esta acción eliminará su expediente del sistema.
             </p>
-
-            <div className="flex gap-4">
-              <button
-                onClick={() => setItemToDelete(null)}
-                className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
-              >
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setItemToDelete(null)} className="flex-1 py-3 bg-slate-100 font-bold text-slate-700 rounded-2xl hover:bg-slate-200">
                 Cancelar
               </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-red-100"
-              >
+              <button onClick={confirmDelete} className="flex-1 py-3 bg-red-600 font-bold text-white rounded-2xl hover:bg-red-700 shadow-lg shadow-red-200">
                 Eliminar
               </button>
             </div>
@@ -526,824 +524,306 @@ const PeopleView: React.FC<Props> = ({ people, setPeople, ministries }) => {
         </div>
       )}
 
-      {/* Perfil Detallado (Rediseñado según solicitud) */}
+      {/* Modal Detalle Expediente */}
       {viewingItem && (
-        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center md:p-4 overflow-hidden animate-in fade-in duration-300">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-4xl md:rounded-[3rem] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar">
-            <div className="relative h-40 md:h-20 bg-gradient-to-br from-[#00555C] via-[#217b83] to-[#044ac3] shrink-0 grid place-items-center">
-              <button
-                onClick={() => setViewingItem(null)}
-                className="
-            absolute top-4 right-4 p-2
-            text-white/80
-            hover:text-white
-            hover:bg-white/10
-            rounded-lg
-            transition-all duration-200
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40
-             "
-              >
-                <X className="w-5 h-5 sm:w-6 sm:h-6" />
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-3xl w-full rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="relative p-6 text-white" style={{ backgroundColor: 'var(--color-primary)' }}>
+              <button onClick={() => setViewingItem(null)} className="absolute top-4 right-4 p-2 text-white/80 hover:text-white rounded-xl hover:bg-white/10">
+                <X className="w-5 h-5" />
               </button>
-
-              {/* Foto de perfil flotante */}
-              <div className="absolute -bottom-12 sm:-bottom-16 left-1/2 -translate-x-1/2 md:left-12 md:translate-x-0">
+              <div className="flex items-center gap-4">
                 <img
-                  src={
-                    viewingItem.photoUrl ||
-                    `https://picsum.photos/seed/${viewingItem.id}/400`
-                  }
-                  className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-[2.5rem] object-cover ring-8 ring-white shadow-2xl cursor-pointer hover:scale-105 transition-transform"
-                  alt="Perfil"
-                  onClick={() =>
-                    setSelectedPhoto(
-                      viewingItem.photoUrl ||
-                        `https://picsum.photos/seed/${viewingItem.id}/400`,
-                    )
-                  }
+                  src={viewingItem.photoUrl || `https://picsum.photos/seed/${viewingItem.id}/300`}
+                  className="w-20 h-20 rounded-2xl object-cover border-2 border-white/40 shadow-md"
+                  alt=""
                 />
+                <div>
+                  <h2 className="text-2xl font-bold">{viewingItem.fullName}</h2>
+                  <p className="text-xs text-white/80 font-mono mt-0.5">{viewingItem.idType} • {viewingItem.identification}</p>
+                  <span className="inline-block mt-2 px-3 py-1 bg-white/20 rounded-full text-xs font-bold">
+                    {viewingItem.membershipType}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="pt-14 sm:pt-16 md:pt-20 px-4 sm:px-8 md:px-12 pb-8 md:pb-12">
-              {/* Encabezado refinado: Nombre */}
-              <div className="text-center md:text-left mb-6 sm:mb-8 md:mb-10 pb-6 sm:pb-8 md:pb-10 border-b border-slate-100">
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4 sm:mb-6">
-                  {viewingItem.fullName}
-                </h2>
-
-                {/* Visual ajustada: Email, ID, Celular, Ministerio */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  <div className="flex items-center gap-3 bg-indigo-50/50 p-3 sm:p-4 rounded-2xl border border-indigo-100 shadow-sm">
-                    <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
-                        Email
-                      </p>
-                      <p className="text-xs sm:text-sm font-bold text-slate-700 truncate">
-                        {viewingItem.email || "No registrado"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm">
-                    <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        {viewingItem.idType}
-                      </p>
-                      <p className="text-xs sm:text-sm font-bold text-slate-700 truncate">
-                        {viewingItem.identification}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm">
-                    <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Celular
-                      </p>
-                      <p className="text-xs sm:text-sm font-bold text-slate-700 truncate">
-                        {viewingItem.phone || "No registrado"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm">
-                    <Church className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Ministerio
-                      </p>
-                      <p className="text-xs sm:text-sm font-bold text-slate-700 truncate">
-                        {ministries.find((m) => m.id === viewingItem.ministryId)
-                          ?.name || "General"}
-                      </p>
-                    </div>
-                  </div>
+            <div className="p-6 space-y-6 text-slate-800">
+              <div className="grid md:grid-cols-3 gap-4 text-xs font-semibold">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-slate-400 uppercase text-[10px]">Email</p>
+                  <p className="text-slate-900 font-bold truncate mt-0.5">{viewingItem.email || "No registrado"}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-slate-400 uppercase text-[10px]">Teléfono</p>
+                  <p className="text-slate-900 font-bold truncate mt-0.5">{viewingItem.phone || "No registrado"}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-slate-400 uppercase text-[10px]">Ministerio</p>
+                  <p className="text-slate-900 font-bold truncate mt-0.5">{ministries.find(m => m.id === viewingItem.ministryId)?.name || "Sin ministerio"}</p>
                 </div>
               </div>
 
-              {/* Grid de detalles secundarios */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="space-y-6">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
-                    Datos Personales
-                  </h3>
-                  <DetailItem
-                    icon={<Heart />}
-                    label="Estado Civil11"
-                    value={viewingItem.civilStatus}
-                  />
-                  <DetailItem
-                    icon={<Calendar />}
-                    label="Nacimiento"
-                    value={viewingItem.birthDate || "No registrado"}
-                  />
-                  <DetailItem
-                    icon={<OccupationIcon />}
-                    label="Ocupación"
-                    value={viewingItem.occupation}
-                  />
-                  <DetailItem
-                    icon={<User />}
-                    label="Sexo / Grupo"
-                    value={`${viewingItem.sex} • ${viewingItem.populationGroup}`}
-                  />
+              <div className="grid md:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-2">
+                  <p className="font-bold text-slate-400 uppercase text-[10px]">Detalles Personales</p>
+                  <p className="text-slate-700">Estado Civil: <strong>{viewingItem.civilStatus}</strong></p>
+                  <p className="text-slate-700">Ocupación: <strong>{viewingItem.occupation}</strong></p>
+                  <p className="text-slate-700">Bautizado: <strong>{viewingItem.isBaptized ? "Sí" : "No"}</strong></p>
                 </div>
-
-                <div className="space-y-6">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
-                    Membresía
-                  </h3>
-                  <DetailItem
-                    icon={<Star />}
-                    label="Tipo de Miembro"
-                    value={viewingItem.membershipType}
-                  />
-                  <DetailItem
-                    icon={<ShieldCheck />}
-                    label="Fecha Membresía"
-                    value={viewingItem.membershipDate}
-                  />
-                  <DetailItem
-                    icon={<Award />}
-                    label="Bautizado"
-                    value={viewingItem.isBaptized ? "Sí" : "No"}
-                  />
-                  <DetailItem
-                    icon={<PartyPopper />}
-                    label="Estado"
-                    value={viewingItem.status}
-                  />
-                </div>
-
-                <div className="space-y-6">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
-                    Ubicación
-                  </h3>
-                  <DetailItem
-                    icon={<MapPin />}
-                    label="Dirección"
-                    value={viewingItem.address || "No registrado"}
-                  />
-                  <DetailItem
-                    icon={<Briefcase />}
-                    label="Barrio"
-                    value={viewingItem.neighborhood || "No registrado"}
-                  />
+                <div className="space-y-2">
+                  <p className="font-bold text-slate-400 uppercase text-[10px]">Dirección y Ubicación</p>
+                  <p className="text-slate-700">Dirección: <strong>{viewingItem.address || "No registrada"}</strong></p>
+                  <p className="text-slate-700">Barrio: <strong>{viewingItem.neighborhood || "No registrado"}</strong></p>
+                  <p className="text-slate-700">Estado: <strong>{viewingItem.status}</strong></p>
                 </div>
               </div>
+            </div>
 
-              <div className="mt-12 flex justify-center md:justify-end">
-                <button
-                  onClick={() => {
-                    setViewingItem(null);
-                    handleOpenModal(viewingItem);
-                  }}
-                  className="
-                  order-1 md:order-2 flex-[2]
-                  bg-[#00555C] text-white py-4 rounded-2xl
-                  font-bold tracking-wide
-                  shadow-lg shadow-[#00555C]/30
-                  hover:bg-[#00454b]
-                  hover:shadow-xl hover:shadow-[#00555C]/40
-                  hover:-translate-y-[1px]
-                  active:scale-[0.97]
-                  transition-all duration-300 ease-out
-                  flex items-center justify-center gap-2
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00555C]/50
-                  "
-                >
-                  <Edit2 className="w-5 h-5" />
-                  Editar Expediente
-                </button>
-              </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+              <button onClick={() => setViewingItem(null)} className="px-5 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs">
+                Cerrar
+              </button>
+              <button
+                onClick={() => { const item = viewingItem; setViewingItem(null); handleOpenModal(item); }}
+                style={{ backgroundColor: 'var(--color-primary)' }}
+                className="px-5 py-2.5 text-white font-bold rounded-xl text-xs flex items-center gap-1.5"
+              >
+                <Edit2 className="w-3.5 h-3.5" /> Editar
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Formulario de Registro/Edición ajustado */}
+      {/* Modal Formulario Registro / Edición */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center md:p-4 overflow-hidden animate-in fade-in duration-300">
-          <div className="bg-white w-full h-full md:h-auto md:max-h-[95vh] md:max-w-4xl md:rounded-[3rem] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar">
-            <div className="relative h-40 md:h-20 bg-gradient-to-br from-[#00555C] via-[#217b83] to-[#FFFFFF] shrink-0 grid place-items-center">
-              <h3 className="text-2xl md:text-3xl font-semibold text-white tracking-wide drop-shadow-md">
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-3xl w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[90vh]">
+            <div className="relative p-6 text-white shrink-0" style={{ backgroundColor: 'var(--color-form-header-bg)' }}>
+              <h3 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold" style={{ color: 'var(--color-form-title-color)' }}>
                 {editingItem ? "EDITAR PERFIL" : "NUEVO PERFIL"}
               </h3>
-
-              <button
-                onClick={() => setIsModalOpen(false)}
-                aria-label="Cerrar modal"
-                className="
-            absolute top-4 right-4 p-2
-            text-white/80
-            hover:text-white
-            hover:bg-white/10
-            rounded-lg
-            transition-all duration-200
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40
-          "
-              >
-                <X className="w-6 h-6" />
+              <button onClick={() => setIsModalOpen(false)} className="absolute right-6 top-1/2 -translate-y-1/2 p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Body Scrollable */}
-            <form
-              onSubmit={handleSave}
-              className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar"
-            >
-              {/* Sección de Foto Refinada para Móvil */}
-              <div className="flex flex-col items-center gap-4 mb-4">
-                <div className="relative group">
-                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-[2rem] overflow-hidden ring-4 ring-slate-50 shadow-xl bg-slate-100">
-                    <img
-                      src={
-                        formData.photoUrl ||
-                        "https://via.placeholder.com/150?text=SIN+FOTO"
-                      }
-                      className="w-full h-full object-cover"
-                      alt=""
-                    />
-                  </div>
-                  <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-[2rem] opacity-0 md:group-hover:opacity-100 cursor-pointer transition-opacity">
-                    <Upload className="text-white w-8 h-8" />
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                  <label className="md:hidden absolute bottom-0 right-0 bg-indigo-600 p-3 rounded-2xl shadow-lg text-white">
-                    <Upload className="w-5 h-5" />
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                    />
+            <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-6 custom-scrollbar text-slate-800">
+              {/* Photo Upload */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative group w-28 h-28 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+                  <img src={formData.photoUrl || "https://via.placeholder.com/150?text=SIN+FOTO"} className="w-full h-full object-cover" alt="" />
+                  <label className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                    <Upload className="w-6 h-6 mb-1" />
+                    <span className="text-[10px] font-bold">Cambiar</span>
+                    <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                   </label>
                 </div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Foto de Perfil
-                </p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Foto de Perfil</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
-                <div className="grid grid-cols-3 gap-3 md:col-span-1">
-                  <div className="col-span-1 space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                      Tipo
-                    </label>
+              {/* Grid Inputs */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Tipo</label>
                     <select
-                      className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#00555c]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                      style={{ color: 'var(--color-form-input-text)' }}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                       value={formData.idType}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          idType: e.target.value as IdType,
-                        })
-                      }
+                      onChange={e => setFormData({ ...formData, idType: e.target.value as IdType })}
                     >
-                      {Object.values(IdType).map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
+                      {Object.values(IdType).map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
-                  <div className="col-span-2 space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                      Identificación
-                    </label>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Identificación</label>
                     <input
                       required
                       type="text"
-                      className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                      style={{ color: 'var(--color-form-input-text)' }}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                       value={formData.identification}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          identification: e.target.value,
-                        })
-                      }
+                      onChange={e => setFormData({ ...formData, identification: e.target.value })}
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Nombre Completo
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Nombre Completo</label>
                   <input
                     required
                     type="text"
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.fullName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fullName: e.target.value })
-                    }
+                    onChange={e => setFormData({ ...formData, fullName: e.target.value })}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Email
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Email</label>
                   <input
                     type="email"
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
+                    onChange={e => setFormData({ ...formData, email: e.target.value })}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Celular
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Celular / Teléfono</label>
                   <input
                     type="tel"
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Dirección
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Dirección</label>
                   <input
                     type="text"
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.address}
-                    onChange={(e) =>
-                      setFormData({ ...formData, address: e.target.value })
-                    }
+                    onChange={e => setFormData({ ...formData, address: e.target.value })}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Barrio
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Barrio</label>
                   <input
                     type="text"
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.neighborhood}
-                    onChange={(e) =>
-                      setFormData({ ...formData, neighborhood: e.target.value })
-                    }
+                    onChange={e => setFormData({ ...formData, neighborhood: e.target.value })}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Ocupación
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Ocupación</label>
                   <select
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.occupation}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        occupation: e.target.value as Occupation,
-                      })
-                    }
+                    onChange={e => setFormData({ ...formData, occupation: e.target.value as Occupation })}
                   >
-                    {Object.values(Occupation).map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
+                    {Object.values(Occupation).map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Fecha Nacimiento
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Fecha de Nacimiento</label>
                   <input
-                    required
                     type="date"
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.birthDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, birthDate: e.target.value })
-                    }
+                    onChange={e => setFormData({ ...formData, birthDate: e.target.value })}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Ministerio
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Ministerio</label>
                   <select
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.ministryId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ministryId: e.target.value })
-                    }
+                    onChange={e => setFormData({ ...formData, ministryId: e.target.value })}
                   >
-                    {activeMinistries.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
+                    {activeMinistries.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                    Membresía
-                  </label>
+                <div>
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Tipo de Membresía</label>
                   <select
-                    className="
-                      w-full px-4 py-3
-                      bg-[#00555C]/10
-                      border border-[#c9d1d2]
-                      rounded-xl
-                      text-sm font-semibold text-[#000000]
-                      outline-none
-                      transition-all duration-200
-
-                      placeholder:text-gray-400
-
-                      hover:border-[#217b83]
-                      focus:border-[#00555c]
-                      focus:ring-2 focus:ring-[#217b83]/30
-                      focus:bg-white
-
-                      shadow-sm
-                    "
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500"
                     value={formData.membershipType}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        membershipType: e.target.value as MembershipType,
-                      })
-                    }
+                    onChange={e => setFormData({ ...formData, membershipType: e.target.value as MembershipType })}
                   >
-                    {Object.values(MembershipType).map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
+                    {Object.values(MembershipType).map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row gap-6 pt-4">
-                <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl cursor-pointer border border-transparent hover:border-indigo-200 transition-all flex-1 bg-[#00555C]/10">
-                  <div
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${formData.isBaptized ? "bg-[#00555C] text-white" : "bg-white border-2 border-slate-200"}`}
-                  >
-                    {formData.isBaptized && <Check className="w-4 h-4" />}
-                  </div>
-                  <span className="text-sm font-semibold text-[#00555c] text-slate-700">
-                    ¿Es Bautizado?
-                  </span>
+              {/* Toggles */}
+              <div className="grid md:grid-cols-3 gap-3 pt-2">
+                <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer hover:bg-slate-100">
                   <input
                     type="checkbox"
-                    className="hidden"
                     checked={formData.isBaptized}
-                    onChange={(e) =>
-                      setFormData({ ...formData, isBaptized: e.target.checked })
-                    }
+                    onChange={e => setFormData({ ...formData, isBaptized: e.target.checked })}
+                    className="w-4 h-4 rounded text-indigo-600"
                   />
+                  <span className="text-xs font-bold text-slate-700">¿Bautizado?</span>
                 </label>
 
-                <div className="flex-1 p-4 bg-slate-50 rounded-2xl flex items-center justify-between bg-[#00555C]/10">
-                  <span className="text-sm font-semibold text-[#00555c]  text-slate-700">Sexo</span>
-                  <div className="flex gap-2">
-                    {Object.values(Gender).map((g) => (
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">Sexo</span>
+                  <div className="flex gap-1">
+                    {Object.values(Gender).map(g => (
                       <button
                         key={g}
                         type="button"
                         onClick={() => setFormData({ ...formData, sex: g })}
-                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${formData.sex === g ? "bg-[#00555C] text-white" : "bg-white text-slate-400 border border-slate-200"}`}
+                        style={{ backgroundColor: formData.sex === g ? 'var(--color-primary)' : undefined }}
+                        className={`px-3 py-1 rounded-xl text-[10px] font-bold transition-all ${formData.sex === g ? 'text-white' : 'bg-white text-slate-600 border'}`}
                       >
-                        {g === Gender.MALE ? "MAS" : "FEM"}
+                        {g === Gender.MALE ? 'Mas' : 'Fem'}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex-1 p-4 bg-slate-50 rounded-2xl flex items-center justify-between bg-[#00555C]/10">
-                  <label className="text-sm font-semibold text-[#00555c]">
-                    Estado civil
-                  </label>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                  <label className="text-[10px] font-bold uppercase" style={{ color: 'var(--color-form-label)' }}>Estado Civil</label>
                   <select
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold"
+                    style={{ color: 'var(--color-form-input-text)' }}
+                    className="w-full bg-transparent text-xs font-bold outline-none"
                     value={formData.civilStatus}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        civilStatus: e.target.value as CivilStatus,
-                      })
-                    }
+                    onChange={e => setFormData({ ...formData, civilStatus: e.target.value as CivilStatus })}
                   >
-                    {Object.values(CivilStatus).map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
+                    {Object.values(CivilStatus).map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               </div>
-            </form>
-            {/* Footer Sticky Corregido para Móvil */}
-            <div className="p-6 md:p-8 bg-white border-t border-slate-100 flex flex-col md:flex-row gap-3 sticky bottom-0 z-20">
-              {/* Cancelar */}
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="
-      order-2 md:order-1 flex-1 py-4
-      rounded-2xl font-semibold
-      text-slate-600
-      border border-slate-200
-      hover:bg-slate-50 hover:border-slate-300
-      active:scale-[0.98]
-      transition-all duration-200
-      focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300
-    "
-              >
-                Cancelar
-              </button>
 
-              {/* Guardar */}
-              <button
-                onClick={handleSave}
-                className="
-      order-1 md:order-2 flex-[2]
-      bg-[#00555C] text-white py-4 rounded-2xl
-      font-bold tracking-wide
-      shadow-lg shadow-[#00555C]/30
-      hover:bg-[#00454b]
-      hover:shadow-xl hover:shadow-[#00555C]/40
-      hover:-translate-y-[1px]
-      active:scale-[0.97]
-      transition-all duration-300 ease-out
-      flex items-center justify-center gap-2
-      focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00555C]/50
-    "
-              >
-                {editingItem ? "Actualizar" : "Guardar"} Miembro
-              </button>
-            </div>
+              <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-100 text-xs">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                  className="px-8 py-3 text-white font-bold rounded-2xl text-xs shadow-lg hover:opacity-90 transition-all"
+                >
+                  {editingItem ? "Actualizar Persona" : "Guardar Persona"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Toast de Notificación */}
+      {/* Toast Notification */}
       {toast && (
-        <Toast
-          type={toast.type}
-          message={toast.message}
-          onClose={() => setToast(null)}
-        />
+        <div className="fixed top-6 right-6 z-[120] animate-in slide-in-from-top-4 duration-200">
+          <div className={`px-5 py-3 rounded-2xl shadow-xl border font-bold text-xs flex items-center gap-2 ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+            <span>{toast.message}</span>
+            <button onClick={() => setToast(null)} className="ml-2 opacity-60 hover:opacity-100">✕</button>
+          </div>
+        </div>
       )}
     </div>
   );
 };
-
-const Toast: React.FC<{
-  type: 'success' | 'error';
-  message: string;
-  onClose: () => void;
-}> = ({ type, message, onClose }) => (
-  <div
-    className="
-      fixed top-14 left-90 z-[120]
-      animate-in slide-in-from-bottom-20 fade-in duration-150
-    "
-    role="status"
-    aria-live="polite"
-  >
-    <div
-      className={`
-        flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border
-        backdrop-blur-xl transition-all duration-150
-        ${type === 'success'
-          ? 'bg-[#E5EEEE]/90 border-[#217b83]/30 text-[#00454B] shadow-[#00555C]/20'
-          : 'bg-[#E5EEEE]/90 border-[#000000]/30 text-[#00555C] shadow-[#044ac3]/20'}
-      `}
-    >
-      <div
-        className={`
-          w-2.5 h-2.5 rounded-full
-          ${type === 'success' ? 'bg-[#217b83]' : 'bg-[#044ac3]'}
-        `}
-      />
-      <span className="text-sm font-bold tracking-wide">{message}</span>
-      <button
-        onClick={onClose}
-        className="
-          ml-4 text-bg-[#E5EEEE]/90 hover:text-white
-          transition-colors text-lg font-bold
-          hover:rotate-90 duration-150
-        "
-        aria-label="Cerrar notificación"
-      >
-        ✕
-      </button>
-    </div>
-  </div>
-);
-
-const DetailItem: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}> = ({ icon, label, value }) => (
-  <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 hover:bg-indigo-50/50 transition-colors border border-transparent hover:border-indigo-100">
-    <div className="text-indigo-600 p-2.5 bg-white rounded-xl shadow-sm border border-slate-100">
-      {React.cloneElement(icon as React.ReactElement, { className: "w-5 h-5" })}
-    </div>
-    <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-        {label}
-      </p>
-      <p className="text-slate-900 font-bold leading-tight mt-0.5">{value}</p>
-    </div>
-  </div>
-);
 
 export default PeopleView;
